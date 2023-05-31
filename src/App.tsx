@@ -17,7 +17,7 @@ function App() {
   ]);
 
   return (
-    <div style={{ height: "100%" }} className="App">
+    <div style={{ height: "100%", paddingBottom: 100 }} className="App">
       <Container maxWidth="xl">
         <Box sx={{ my: 4 }}>
           <Typography variant="h4" component="h1" gutterBottom>
