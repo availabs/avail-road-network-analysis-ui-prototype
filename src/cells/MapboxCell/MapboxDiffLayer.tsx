@@ -4,6 +4,8 @@ import { produce, Draft } from "immer";
 import _ from "lodash";
 import { Map } from "mapbox-gl"; // eslint-disable-line import/no-webpack-loader-syntax
 
+import * as turf from "@turf/turf";
+
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import FormControl from "@mui/material/FormControl";
@@ -272,7 +274,8 @@ export function MapboxDiffLayerForm({
             }
           );
 
-          const feature_collection = await response.json();
+          const feature_collection =
+            (await response.json()) as turf.FeatureCollection<turf.MultiLineString>;
 
           return feature_collection;
         }
@@ -280,6 +283,19 @@ export function MapboxDiffLayerForm({
     );
 
     const layer_id_a = `${layer_id}_a`;
+
+    for (let i = 0; i < feature_collections[0].features.length; ++i) {
+      const feature = feature_collections[0].features[i] as turf.Feature<
+        turf.MultiLineString,
+        object
+      >;
+
+      const offset = turf.lineOffset(feature, +layer_offset / 3, {
+        units: "yards",
+      });
+
+      feature_collections[0].features[i] = offset;
+    }
 
     try {
       map.removeLayer(layer_id_a);
@@ -302,11 +318,24 @@ export function MapboxDiffLayerForm({
       paint: {
         "line-color": "#FF3131",
         "line-width": 1,
-        "line-offset": +layer_offset,
+        "line-offset": 2,
       },
     });
 
     const layer_id_b = `${layer_id}_b`;
+
+    for (let i = 0; i < feature_collections[1].features.length; ++i) {
+      const feature = feature_collections[1].features[i] as turf.Feature<
+        turf.MultiLineString,
+        object
+      >;
+
+      const offset = turf.lineOffset(feature, (+layer_offset * 2) / 3, {
+        units: "yards",
+      });
+
+      feature_collections[1].features[i] = offset;
+    }
 
     try {
       map.removeLayer(layer_id_b);
@@ -315,7 +344,7 @@ export function MapboxDiffLayerForm({
 
     map.addSource(layer_id_b, {
       type: "geojson",
-      data: feature_collections[0],
+      data: feature_collections[1],
     });
 
     map.addLayer({
@@ -329,7 +358,7 @@ export function MapboxDiffLayerForm({
       paint: {
         "line-color": "#00FA9A",
         "line-width": 1,
-        "line-offset": +layer_offset * 2,
+        "line-offset": 4,
       },
     });
   }
@@ -384,7 +413,9 @@ export function MapboxDiffLayerForm({
             >
               {dep_map_menu_items}
             </Select>
-            <FormHelperText>Map A</FormHelperText>
+            <FormHelperText>
+              <span style={{ color: "#FF3131" }}>Map A</span>
+            </FormHelperText>
           </FormControl>
 
           <FormControl sx={{ m: 1, minWidth: 300 }}>
@@ -404,7 +435,9 @@ export function MapboxDiffLayerForm({
             >
               {dep_map_menu_items}
             </Select>
-            <FormHelperText>Map B</FormHelperText>
+            <FormHelperText>
+              <span style={{ color: "#00FA9A" }}>Map B</span>
+            </FormHelperText>
           </FormControl>
 
           <FormControl sx={{ m: 1, minWidth: 100 }}>
@@ -417,7 +450,7 @@ export function MapboxDiffLayerForm({
                 dispatchLayerOffsetChange(value);
               }}
             />
-            <FormHelperText>Lines Offset</FormHelperText>
+            <FormHelperText>Lines Offset (feet)</FormHelperText>
           </FormControl>
           {RenderButton}
         </CardContent>
