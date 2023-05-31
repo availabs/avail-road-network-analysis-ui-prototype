@@ -52,6 +52,24 @@ export type CellAction = {
   payload: any;
 };
 
+type TmcFeature = turf.Feature<turf.MultiLineString, turf.Properties>;
+
+export function getPolygon(geometries: [TmcFeature, TmcFeature]) {
+  const a_coords = _.chunk(_.flattenDeep(turf.getCoords(geometries[0])), 2);
+  const b_coords = _.chunk(_.flattenDeep(turf.getCoords(geometries[1])), 2);
+
+  const combined_coords = [...a_coords, ...b_coords.reverse(), a_coords[0]];
+
+  const line = turf.lineString(combined_coords);
+
+  const polygon = turf.lineToPolygon(line) as turf.Feature<
+    turf.Polygon,
+    turf.Properties
+  >;
+
+  return polygon;
+}
+
 export function mapboxDiffLayersReducer(
   cell: MapboxDiffLayerState,
   action: CellAction
@@ -275,90 +293,226 @@ export function MapboxDiffLayerForm({
           );
 
           const feature_collection =
-            (await response.json()) as turf.FeatureCollection<turf.MultiLineString>;
+            (await response.json()) as turf.FeatureCollection<
+              turf.MultiLineString,
+              turf.Properties
+            >;
 
           return feature_collection;
         }
       )
     );
 
-    const layer_id_a = `${layer_id}_a`;
+    type TmcFeaturesById = Record<string, TmcFeature>;
+    const layer_a_features_by_tmc: TmcFeaturesById = {};
 
-    for (let i = 0; i < feature_collections[0].features.length; ++i) {
-      const feature = feature_collections[0].features[i] as turf.Feature<
-        turf.MultiLineString,
-        object
-      >;
+    for (const feature of feature_collections[0].features) {
+      const {
+        // @ts-ignore
+        properties: { tmc },
+      } = feature;
 
       const offset = turf.lineOffset(feature, +layer_offset / 3, {
         units: "yards",
       });
 
-      feature_collections[0].features[i] = offset;
+      layer_a_features_by_tmc[tmc] = offset;
     }
 
-    try {
-      map.removeLayer(layer_id_a);
-      map.removeSource(layer_id_a);
-    } catch (err) {}
+    const layer_b_features_by_tmc: TmcFeaturesById = {};
 
-    map.addSource(layer_id_a, {
-      type: "geojson",
-      data: feature_collections[0],
-    });
-
-    map.addLayer({
-      id: layer_id_a,
-      type: "line",
-      source: layer_id_a,
-      layout: {
-        "line-join": "round",
-        "line-cap": "round",
-      },
-      paint: {
-        "line-color": "#FF3131",
-        "line-width": 1,
-        "line-offset": 2,
-      },
-    });
-
-    const layer_id_b = `${layer_id}_b`;
-
-    for (let i = 0; i < feature_collections[1].features.length; ++i) {
-      const feature = feature_collections[1].features[i] as turf.Feature<
-        turf.MultiLineString,
-        object
-      >;
+    for (const feature of feature_collections[1].features) {
+      const {
+        // @ts-ignore
+        properties: { tmc },
+      } = feature;
 
       const offset = turf.lineOffset(feature, (+layer_offset * 2) / 3, {
         units: "yards",
       });
 
-      feature_collections[1].features[i] = offset;
+      layer_b_features_by_tmc[tmc] = offset;
     }
 
+    const a_tmcs = Object.keys(layer_a_features_by_tmc);
+    const b_tmcs = Object.keys(layer_b_features_by_tmc);
+
+    // A ∩ B
+    const a_and_b_tmcs = _.intersection(a_tmcs, b_tmcs);
+
+    const a_intxn_feature_collection = turf.featureCollection(
+      a_and_b_tmcs.map((tmc) => layer_a_features_by_tmc[tmc])
+    );
+
+    const a_intxn_layer_id = `${layer_id}::a_intxn`;
+
     try {
-      map.removeLayer(layer_id_b);
-      map.removeSource(layer_id_b);
+      map.removeLayer(a_intxn_layer_id);
+      map.removeSource(a_intxn_layer_id);
     } catch (err) {}
 
-    map.addSource(layer_id_b, {
+    map.addSource(a_intxn_layer_id, {
       type: "geojson",
-      data: feature_collections[1],
+      data: a_intxn_feature_collection,
     });
 
     map.addLayer({
-      id: layer_id_b,
+      id: a_intxn_layer_id,
       type: "line",
-      source: layer_id_b,
+      source: a_intxn_layer_id,
       layout: {
         "line-join": "round",
         "line-cap": "round",
       },
       paint: {
-        "line-color": "#00FA9A",
+        "line-color": "#f3f700",
         "line-width": 1,
-        "line-offset": 4,
+        // "line-offset": layer_offset,
+      },
+    });
+
+    const b_intxn_feature_collection = turf.featureCollection(
+      a_and_b_tmcs.map((tmc) => layer_b_features_by_tmc[tmc])
+    );
+
+    const b_intxn_layer_id = `${layer_id}::b_intxn`;
+
+    try {
+      map.removeLayer(b_intxn_layer_id);
+      map.removeSource(b_intxn_layer_id);
+    } catch (err) {}
+
+    map.addSource(b_intxn_layer_id, {
+      type: "geojson",
+      data: b_intxn_feature_collection,
+    });
+
+    map.addLayer({
+      id: b_intxn_layer_id,
+      type: "line",
+      source: b_intxn_layer_id,
+      layout: {
+        "line-join": "round",
+        "line-cap": "round",
+      },
+      paint: {
+        "line-color": "#f3f700",
+        "line-width": 1,
+        // "line-offset": layer_offset * 2,
+      },
+    });
+
+    const intxn_polygons = a_and_b_tmcs.map((tmc) =>
+      getPolygon([layer_a_features_by_tmc[tmc], layer_b_features_by_tmc[tmc]])
+    );
+
+    const intxn_polygons_feature_collection =
+      turf.featureCollection(intxn_polygons);
+
+    const inxtn_polygons_source_id = `${layer_id}::intxn_polygons`;
+    const inxtn_polygons_fill_id = `${inxtn_polygons_source_id}::fill`;
+    const inxtn_polygons_outline_id = `${inxtn_polygons_source_id}::outline`;
+
+    try {
+      map.removeLayer(inxtn_polygons_fill_id);
+      map.removeLayer(inxtn_polygons_outline_id);
+      map.removeSource(inxtn_polygons_source_id);
+    } catch (err) {}
+
+    map.addSource(inxtn_polygons_source_id, {
+      type: "geojson",
+      data: intxn_polygons_feature_collection,
+    });
+
+    map.addLayer({
+      id: inxtn_polygons_fill_id,
+      type: "fill",
+      source: inxtn_polygons_source_id,
+      layout: {},
+      paint: {
+        "fill-color": "#f3f700",
+        "fill-opacity": 0.5,
+        // "line-offset": layer_offset * 2,
+      },
+    });
+
+    map.addLayer({
+      id: inxtn_polygons_outline_id,
+      type: "line",
+      source: inxtn_polygons_source_id,
+      layout: {},
+      paint: {
+        "line-color": "#f3f700",
+        "line-width": 1,
+        // "line-offset": layer_offset * 2,
+      },
+    });
+
+    // A - B
+    const a_only_tmcs = _.difference(a_tmcs, b_tmcs);
+
+    const a_only_feature_collection = turf.featureCollection(
+      a_only_tmcs.map((tmc) => layer_a_features_by_tmc[tmc])
+    );
+
+    const a_only_layer_id = `${layer_id}::a_only`;
+
+    try {
+      map.removeLayer(a_only_layer_id);
+      map.removeSource(a_only_layer_id);
+    } catch (err) {}
+
+    map.addSource(a_only_layer_id, {
+      type: "geojson",
+      data: a_only_feature_collection,
+    });
+
+    map.addLayer({
+      id: a_only_layer_id,
+      type: "line",
+      source: a_only_layer_id,
+      layout: {
+        "line-join": "round",
+        "line-cap": "round",
+      },
+      paint: {
+        "line-color": "#ff0000",
+        "line-width": 3,
+        // "line-offset": layer_offset,
+      },
+    });
+
+    // B - A
+    const b_only_tmcs = _.difference(b_tmcs, a_tmcs);
+
+    const b_only_feature_collection = turf.featureCollection(
+      b_only_tmcs.map((tmc) => layer_b_features_by_tmc[tmc])
+    );
+
+    const b_only_layer_id = `${layer_id}::b_only`;
+
+    try {
+      map.removeLayer(b_only_layer_id);
+      map.removeSource(b_only_layer_id);
+    } catch (err) {}
+
+    map.addSource(b_only_layer_id, {
+      type: "geojson",
+      data: b_only_feature_collection,
+    });
+
+    map.addLayer({
+      id: b_only_layer_id,
+      type: "line",
+      source: b_only_layer_id,
+      layout: {
+        "line-join": "round",
+        "line-cap": "round",
+      },
+      paint: {
+        "line-color": "#7d7aff",
+        "line-width": 3,
+        // "line-offset": layer_offset * 2,
       },
     });
   }
