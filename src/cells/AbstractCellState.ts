@@ -73,6 +73,7 @@ export default abstract class AbstractCellState {
     });
   }
 
+  // MUST be able to reconstruct ALL cells from localStorage using their meta.
   get meta() {
     if (!this.is_ready) {
       throw new Error("Cell is not ready.");
