@@ -321,7 +321,7 @@ export function MapboxLinesLayerForm({
     console.log(dependency_cells_meta);
 
     const response = await fetch(
-      `${API_URL}/dama-admin/dama_dev_1/data-types/npmrds/network-analysis/getTmcFeatures`,
+      `${API_URL}/data-types/npmrds/network-analysis/getTmcFeatures`,
       {
         method: "POST", // *GET, POST, PUT, DELETE, etc.
         headers: {
