@@ -287,8 +287,6 @@ export function MapboxLinesLayerForm({
     });
 
   async function fetchTmcs() {
-    console.log("FETCH TMCS");
-
     const dependency_cells_meta = [cells[layer_dependency_id as number].meta];
 
     const seen_cell_ids = new Set([layer_dependency_id]);
@@ -362,6 +360,10 @@ export function MapboxLinesLayerForm({
         "line-offset": +line_offset,
       },
     });
+
+    if (!layer_visible) {
+      dispatchToggleLayerVisibility();
+    }
   }
 
   const map_candidates = Object.values(cells).filter((cell_state) => {

@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useEffect } from "react";
 
 import { produce, Draft } from "immer";
 import _ from "lodash";
@@ -45,6 +45,8 @@ export enum CellActionType {
   SET_LAYER_DEPENDENCY_B = "SET_LAYER_DEPENDENCY_B",
 
   SET_LAYER_OFFSET = "SET_LAYER_OFFSET",
+
+  TOGGLE_LAYER_VISIBILITY = "TOGGLE_LAYER_VISIBILITY",
 }
 
 export type CellAction = {
@@ -96,6 +98,11 @@ export function mapboxDiffLayersReducer(
   if (type === CellActionType.SET_LAYER_OFFSET) {
     const { layer_id, layer_offset } = payload;
     return cell.setLayerOffset(layer_id, layer_offset);
+  }
+
+  if (type === CellActionType.TOGGLE_LAYER_VISIBILITY) {
+    const { layer_id } = payload;
+    return cell.toggleLayerVisibility(layer_id);
   }
 
   return cell;
@@ -182,6 +189,43 @@ export class MapboxDiffLayerState extends AbstractCellState {
       layer_meta!.layer_offset = layer_offset;
     });
   }
+
+  toggleLayerVisibility(layer_id: LayerID) {
+    return produce(this, (draft: Draft<this>) => {
+      const layer_meta = draft._descriptor.layers.find(
+        ({ layer_id: id }) => id === layer_id
+      );
+
+      layer_meta!.layer_visible = !layer_meta!.layer_visible;
+    });
+  }
+}
+
+function getSourceAndLayerNames(layer_id: LayerID) {
+  const a_intxn = `${layer_id}::a_intxn`;
+  const b_intxn = `${layer_id}::b_intxn`;
+  const a_only = `${layer_id}::a_only`;
+  const b_only = `${layer_id}::b_only`;
+
+  const inxtn_polygons = `${layer_id}::intxn_polygons`;
+
+  return {
+    sources: {
+      a_intxn: `${a_intxn}::source`,
+      b_intxn: `${b_intxn}::source`,
+      a_only: `${a_only}::source`,
+      b_only: `${b_only}::source`,
+      inxtn_polygons: `${inxtn_polygons}::source`,
+    },
+    layers: {
+      a_intxn: `${a_intxn}::layer`,
+      b_intxn: `${b_intxn}::layer`,
+      a_only: `${a_only}::layer`,
+      b_only: `${b_only}::layer`,
+      inxtn_polygons_fill: `${inxtn_polygons}::fill::layer`,
+      inxtn_polygons_outline: `${inxtn_polygons}::outline::layer`,
+    },
+  };
 }
 
 export function MapboxDiffLayerForm({
@@ -200,11 +244,30 @@ export function MapboxDiffLayerForm({
     layer_dependency_id_a,
     layer_dependency_id_b,
     layer_offset,
+    layer_visible,
   } = layer_meta;
 
   const { cells } = useContext(CellsContext);
 
   const this_cell = cells[this_cell_id];
+
+  useEffect(() => {
+    if (!map) {
+      return;
+    }
+
+    const { layers } = getSourceAndLayerNames(layer_id);
+
+    for (const layer_id of Object.values(layers)) {
+      try {
+        map.setLayoutProperty(
+          layer_id,
+          "visibility",
+          layer_visible ? "visible" : "none"
+        );
+      } catch (err) {}
+    }
+  }, [map, layer_visible, layer_id]);
 
   if (!this_cell) {
     return null;
@@ -234,6 +297,14 @@ export function MapboxDiffLayerForm({
       payload: {
         layer_id,
         layer_offset,
+      },
+    });
+
+  const dispatchToggleLayerVisibility = () =>
+    dispatch({
+      type: CellActionType.TOGGLE_LAYER_VISIBILITY,
+      payload: {
+        layer_id,
       },
     });
 
@@ -334,73 +405,13 @@ export function MapboxDiffLayerForm({
       layer_b_features_by_tmc[tmc] = offset;
     }
 
+    const names = getSourceAndLayerNames(layer_id);
+
     const a_tmcs = Object.keys(layer_a_features_by_tmc);
     const b_tmcs = Object.keys(layer_b_features_by_tmc);
 
     // A ∩ B
     const a_and_b_tmcs = _.intersection(a_tmcs, b_tmcs);
-
-    const a_intxn_feature_collection = turf.featureCollection(
-      a_and_b_tmcs.map((tmc) => layer_a_features_by_tmc[tmc])
-    );
-
-    const a_intxn_layer_id = `${layer_id}::a_intxn`;
-
-    try {
-      map.removeLayer(a_intxn_layer_id);
-      map.removeSource(a_intxn_layer_id);
-    } catch (err) {}
-
-    map.addSource(a_intxn_layer_id, {
-      type: "geojson",
-      data: a_intxn_feature_collection,
-    });
-
-    map.addLayer({
-      id: a_intxn_layer_id,
-      type: "line",
-      source: a_intxn_layer_id,
-      layout: {
-        "line-join": "round",
-        "line-cap": "round",
-      },
-      paint: {
-        "line-color": "#f3f700",
-        "line-width": 1,
-        // "line-offset": layer_offset,
-      },
-    });
-
-    const b_intxn_feature_collection = turf.featureCollection(
-      a_and_b_tmcs.map((tmc) => layer_b_features_by_tmc[tmc])
-    );
-
-    const b_intxn_layer_id = `${layer_id}::b_intxn`;
-
-    try {
-      map.removeLayer(b_intxn_layer_id);
-      map.removeSource(b_intxn_layer_id);
-    } catch (err) {}
-
-    map.addSource(b_intxn_layer_id, {
-      type: "geojson",
-      data: b_intxn_feature_collection,
-    });
-
-    map.addLayer({
-      id: b_intxn_layer_id,
-      type: "line",
-      source: b_intxn_layer_id,
-      layout: {
-        "line-join": "round",
-        "line-cap": "round",
-      },
-      paint: {
-        "line-color": "#f3f700",
-        "line-width": 1,
-        // "line-offset": layer_offset * 2,
-      },
-    });
 
     const intxn_polygons = a_and_b_tmcs.map((tmc) =>
       getPolygon([layer_a_features_by_tmc[tmc], layer_b_features_by_tmc[tmc]])
@@ -409,25 +420,21 @@ export function MapboxDiffLayerForm({
     const intxn_polygons_feature_collection =
       turf.featureCollection(intxn_polygons);
 
-    const inxtn_polygons_source_id = `${layer_id}::intxn_polygons`;
-    const inxtn_polygons_fill_id = `${inxtn_polygons_source_id}::fill`;
-    const inxtn_polygons_outline_id = `${inxtn_polygons_source_id}::outline`;
-
     try {
-      map.removeLayer(inxtn_polygons_fill_id);
-      map.removeLayer(inxtn_polygons_outline_id);
-      map.removeSource(inxtn_polygons_source_id);
+      map.removeLayer(names.layers.inxtn_polygons_fill);
+      map.removeLayer(names.layers.inxtn_polygons_outline);
+      map.removeSource(names.sources.inxtn_polygons);
     } catch (err) {}
 
-    map.addSource(inxtn_polygons_source_id, {
+    map.addSource(names.sources.inxtn_polygons, {
       type: "geojson",
       data: intxn_polygons_feature_collection,
     });
 
     map.addLayer({
-      id: inxtn_polygons_fill_id,
+      id: names.layers.inxtn_polygons_fill,
       type: "fill",
-      source: inxtn_polygons_source_id,
+      source: names.sources.inxtn_polygons,
       layout: {},
       paint: {
         "fill-color": "#f3f700",
@@ -437,13 +444,72 @@ export function MapboxDiffLayerForm({
     });
 
     map.addLayer({
-      id: inxtn_polygons_outline_id,
+      id: names.layers.inxtn_polygons_outline,
       type: "line",
-      source: inxtn_polygons_source_id,
+      source: names.sources.inxtn_polygons,
       layout: {},
       paint: {
+        // "line-color": "#000000",
         "line-color": "#f3f700",
         "line-width": 1,
+        // "line-offset": layer_offset * 2,
+      },
+    });
+
+    const a_intxn_feature_collection = turf.featureCollection(
+      a_and_b_tmcs.map((tmc) => layer_a_features_by_tmc[tmc])
+    );
+
+    try {
+      map.removeLayer(names.layers.a_intxn);
+      map.removeSource(names.sources.a_intxn);
+    } catch (err) {}
+
+    map.addSource(names.sources.a_intxn, {
+      type: "geojson",
+      data: a_intxn_feature_collection,
+    });
+
+    map.addLayer({
+      id: names.layers.a_intxn,
+      type: "line",
+      source: names.sources.a_intxn,
+      layout: {
+        "line-join": "round",
+        "line-cap": "round",
+      },
+      paint: {
+        "line-color": "#f3f700",
+        "line-width": 2,
+        // "line-offset": layer_offset,
+      },
+    });
+
+    const b_intxn_feature_collection = turf.featureCollection(
+      a_and_b_tmcs.map((tmc) => layer_b_features_by_tmc[tmc])
+    );
+
+    try {
+      map.removeLayer(names.layers.b_intxn);
+      map.removeSource(names.sources.b_intxn);
+    } catch (err) {}
+
+    map.addSource(names.sources.b_intxn, {
+      type: "geojson",
+      data: b_intxn_feature_collection,
+    });
+
+    map.addLayer({
+      id: names.layers.b_intxn,
+      type: "line",
+      source: names.sources.b_intxn,
+      layout: {
+        "line-join": "round",
+        "line-cap": "round",
+      },
+      paint: {
+        "line-color": "#f3f700",
+        "line-width": 2,
         // "line-offset": layer_offset * 2,
       },
     });
@@ -455,22 +521,20 @@ export function MapboxDiffLayerForm({
       a_only_tmcs.map((tmc) => layer_a_features_by_tmc[tmc])
     );
 
-    const a_only_layer_id = `${layer_id}::a_only`;
-
     try {
-      map.removeLayer(a_only_layer_id);
-      map.removeSource(a_only_layer_id);
+      map.removeLayer(names.layers.a_only);
+      map.removeSource(names.sources.a_only);
     } catch (err) {}
 
-    map.addSource(a_only_layer_id, {
+    map.addSource(names.sources.a_only, {
       type: "geojson",
       data: a_only_feature_collection,
     });
 
     map.addLayer({
-      id: a_only_layer_id,
+      id: names.layers.a_only,
       type: "line",
-      source: a_only_layer_id,
+      source: names.sources.a_only,
       layout: {
         "line-join": "round",
         "line-cap": "round",
@@ -489,22 +553,20 @@ export function MapboxDiffLayerForm({
       b_only_tmcs.map((tmc) => layer_b_features_by_tmc[tmc])
     );
 
-    const b_only_layer_id = `${layer_id}::b_only`;
-
     try {
-      map.removeLayer(b_only_layer_id);
-      map.removeSource(b_only_layer_id);
+      map.removeLayer(names.layers.b_only);
+      map.removeSource(names.sources.b_only);
     } catch (err) {}
 
-    map.addSource(b_only_layer_id, {
+    map.addSource(names.sources.b_only, {
       type: "geojson",
       data: b_only_feature_collection,
     });
 
     map.addLayer({
-      id: b_only_layer_id,
+      id: names.layers.b_only,
       type: "line",
-      source: b_only_layer_id,
+      source: names.sources.b_only,
       layout: {
         "line-join": "round",
         "line-cap": "round",
@@ -515,6 +577,10 @@ export function MapboxDiffLayerForm({
         // "line-offset": layer_offset * 2,
       },
     });
+
+    if (!layer_visible) {
+      dispatchToggleLayerVisibility();
+    }
   }
 
   const map_candidates = Object.values(cells).filter((cell_state) => {
@@ -538,12 +604,6 @@ export function MapboxDiffLayerForm({
         {cell_name}
       </MenuItem>
     )
-  );
-
-  const RenderButton = (
-    <Button variant="contained" color="success" onClick={fetchTmcs}>
-      Render
-    </Button>
   );
 
   return (
@@ -606,7 +666,18 @@ export function MapboxDiffLayerForm({
             />
             <FormHelperText>Lines Offset (feet)</FormHelperText>
           </FormControl>
-          {RenderButton}
+          <span style={{ padding: 10 }}>
+            <Button variant="contained" color="success" onClick={fetchTmcs}>
+              Render
+            </Button>
+          </span>
+          <Button
+            variant="contained"
+            color="success"
+            onClick={dispatchToggleLayerVisibility}
+          >
+            {layer_visible ? "Hide" : "Show"}
+          </Button>
         </CardContent>
       </Card>
     </Box>
