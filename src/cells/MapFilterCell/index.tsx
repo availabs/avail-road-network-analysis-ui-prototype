@@ -167,8 +167,6 @@ function CellForm({
     return null;
   }
 
-  console.log({ this_cell_id, cells });
-
   const candidates = Object.values(cells).filter((cell_state) => {
     const is_map_cell = cell_state instanceof AbstractMapCellState;
     const is_not_self = cell_state.cell_id !== this_cell_id;

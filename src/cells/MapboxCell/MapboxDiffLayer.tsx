@@ -233,11 +233,15 @@ export function MapboxDiffLayerForm({
   layer_meta,
   dispatch,
   map,
+  hovered_tmc,
+  setHoveredTmc,
 }: {
   this_cell_id: CellID;
   layer_meta: LayerMeta;
   dispatch: (action: CellAction) => void;
   map: Map;
+  hovered_tmc: string | null;
+  setHoveredTmc: (tmc: string | null) => void;
 }) {
   const {
     layer_id,
@@ -268,6 +272,24 @@ export function MapboxDiffLayerForm({
       } catch (err) {}
     }
   }, [map, layer_visible, layer_id]);
+
+  useEffect(() => {
+    if (!map) {
+      return;
+    }
+
+    const { layers } = getSourceAndLayerNames(layer_id);
+
+    const filter = hovered_tmc
+      ? ["match", ["get", "tmc"], [hovered_tmc], true, false]
+      : null;
+
+    for (const layer_id of Object.values(layers)) {
+      try {
+        map.setFilter(layer_id, filter);
+      } catch (err) {}
+    }
+  }, [map, hovered_tmc, layer_id]);
 
   if (!this_cell) {
     return null;
@@ -374,6 +396,20 @@ export function MapboxDiffLayerForm({
       )
     );
 
+    function updateHoveredTmc(e: any) {
+      const tmc = (e && e.features && e.features?.[0]?.properties?.tmc) || null;
+
+      console.log("==> tmc", tmc);
+
+      if (tmc !== hovered_tmc) {
+        console.log("Updating hovered TMC from", hovered_tmc, "to", tmc);
+        setHoveredTmc(tmc);
+      } else if (tmc === null && hovered_tmc !== null) {
+        console.log("Updating hovered TMC from", hovered_tmc, "to", tmc);
+        setHoveredTmc(null);
+      }
+    }
+
     type TmcFeaturesById = Record<string, TmcFeature>;
     const layer_a_features_by_tmc: TmcFeaturesById = {};
 
@@ -406,6 +442,20 @@ export function MapboxDiffLayerForm({
     }
 
     const names = getSourceAndLayerNames(layer_id);
+
+    for (const layer_id of Object.values(names.layers)) {
+      try {
+        map.removeLayer(layer_id);
+        map.off("mousemove", layer_id, updateHoveredTmc);
+        map.off("mouseleave", layer_id, updateHoveredTmc);
+      } catch (err) {}
+    }
+
+    for (const source_id of Object.values(names.sources)) {
+      try {
+        map.removeSource(source_id);
+      } catch (err) {}
+    }
 
     const a_tmcs = Object.keys(layer_a_features_by_tmc);
     const b_tmcs = Object.keys(layer_b_features_by_tmc);
@@ -459,11 +509,6 @@ export function MapboxDiffLayerForm({
     const a_intxn_feature_collection = turf.featureCollection(
       a_and_b_tmcs.map((tmc) => layer_a_features_by_tmc[tmc])
     );
-
-    try {
-      map.removeLayer(names.layers.a_intxn);
-      map.removeSource(names.sources.a_intxn);
-    } catch (err) {}
 
     map.addSource(names.sources.a_intxn, {
       type: "geojson",
@@ -581,6 +626,9 @@ export function MapboxDiffLayerForm({
     if (!layer_visible) {
       dispatchToggleLayerVisibility();
     }
+
+    map.on("mousemove", Object.values(names.layers), updateHoveredTmc);
+    map.on("mouseleave", Object.values(names.layers), updateHoveredTmc);
   }
 
   const map_candidates = Object.values(cells).filter((cell_state) => {
