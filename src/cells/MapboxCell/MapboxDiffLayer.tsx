@@ -69,6 +69,10 @@ export function getPolygon(geometries: [TmcFeature, TmcFeature]) {
     turf.Properties
   >;
 
+  const tmc = geometries[0].properties!.tmc;
+
+  polygon.properties = { tmc };
+
   return polygon;
 }
 

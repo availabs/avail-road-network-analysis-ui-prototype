@@ -1,4 +1,4 @@
-import { useContext, useRef, useEffect, useReducer } from "react";
+import { useContext, useRef, useEffect, useReducer, useState } from "react";
 
 import { v4 as uuid } from "uuid";
 
@@ -36,6 +36,8 @@ const map_initial_state = {
 export default function MapboxCell() {
   const mapContainer = useRef(null);
   const map: { current: Map | null } = useRef(null);
+
+  const [hovered_tmc, setHoveredTmc] = useState(null as string | null);
 
   // CONSIDER: Cells pass their Maps their state through props.
   // That way, cells control state via linesLayerDispatch.
@@ -99,6 +101,8 @@ export default function MapboxCell() {
           layer_meta={layer_meta}
           dispatch={diffLayerDispatch}
           map={map.current!}
+          hovered_tmc={hovered_tmc}
+          setHoveredTmc={setHoveredTmc}
         />
       ))
     : "";
