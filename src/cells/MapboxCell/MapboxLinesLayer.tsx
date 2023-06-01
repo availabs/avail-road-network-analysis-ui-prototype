@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useEffect } from "react";
 
 import { produce, Draft } from "immer";
 import _ from "lodash";
@@ -54,6 +54,7 @@ export enum CellActionType {
   SET_LAYER_COLOR = "SET_LAYER_COLOR",
   SET_LAYER_LINE_WIDTH = "SET_LAYER_LINE_WIDTH",
   SET_LAYER_LINE_OFFSET = "SET_LAYER_LINE_OFFSET",
+  TOGGLE_LAYER_VISIBILITY = "TOGGLE_LAYER_VISIBILITY",
 }
 
 export type CellAction = {
@@ -92,6 +93,11 @@ export function mapboxLinesLayersReducer(
   if (type === CellActionType.SET_LAYER_LINE_OFFSET) {
     const { layer_id, line_offset } = payload;
     return cell.setLineOffset(layer_id, line_offset);
+  }
+
+  if (type === CellActionType.TOGGLE_LAYER_VISIBILITY) {
+    const { layer_id } = payload;
+    return cell.toggleLayerVisibility(layer_id);
   }
 
   return cell;
@@ -186,6 +192,16 @@ export class MapboxLinesLayerState extends AbstractCellState {
       layer_meta!.layer_style.line_offset = line_offset;
     });
   }
+
+  toggleLayerVisibility(layer_id: LayerID) {
+    return produce(this, (draft: Draft<this>) => {
+      const layer_meta = draft._descriptor.layers.find(
+        ({ layer_id: id }) => id === layer_id
+      );
+
+      layer_meta!.layer_visible = !layer_meta!.layer_visible;
+    });
+  }
 }
 
 export function MapboxLinesLayerForm({
@@ -203,11 +219,24 @@ export function MapboxLinesLayerForm({
     layer_id,
     layer_style: { line_color, line_width, line_offset },
     layer_dependency_id,
+    layer_visible,
   } = layer_meta;
 
   const { cells } = useContext(CellsContext);
 
   const this_cell = cells[this_cell_id];
+
+  useEffect(() => {
+    if (!map) {
+      return;
+    }
+
+    map.setLayoutProperty(
+      layer_id,
+      "visibility",
+      layer_visible ? "visible" : "none"
+    );
+  }, [map, layer_visible, layer_id]);
 
   if (!this_cell) {
     return null;
@@ -246,6 +275,14 @@ export function MapboxLinesLayerForm({
       payload: {
         layer_id,
         line_offset,
+      },
+    });
+
+  const dispatchToggleLayerVisibility = () =>
+    dispatch({
+      type: CellActionType.TOGGLE_LAYER_VISIBILITY,
+      payload: {
+        layer_id,
       },
     });
 
@@ -350,12 +387,6 @@ export function MapboxLinesLayerForm({
     )
   );
 
-  const RenderButton = (
-    <Button variant="contained" color="success" onClick={fetchTmcs}>
-      Render
-    </Button>
-  );
-
   return (
     <Box key={layer_id} style={{ paddingBottom: 10 }}>
       <Card sx={{ minWidth: 275 }}>
@@ -419,7 +450,18 @@ export function MapboxLinesLayerForm({
             />
             <FormHelperText>Line Offset</FormHelperText>
           </FormControl>
-          {RenderButton}
+          <span style={{ padding: 10 }}>
+            <Button variant="contained" color="success" onClick={fetchTmcs}>
+              Render
+            </Button>
+          </span>
+          <Button
+            variant="contained"
+            color="success"
+            onClick={dispatchToggleLayerVisibility}
+          >
+            {layer_visible ? "Hide" : "Show"}
+          </Button>
         </CardContent>
       </Card>
     </Box>
