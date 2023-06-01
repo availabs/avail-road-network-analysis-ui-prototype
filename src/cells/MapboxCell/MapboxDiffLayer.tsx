@@ -58,7 +58,7 @@ export type CellAction = {
 
 type TmcFeature = turf.Feature<turf.MultiLineString, turf.Properties>;
 
-export function getPolygon(geometries: [TmcFeature, TmcFeature]) {
+export function getPolygons(geometries: [TmcFeature, TmcFeature]) {
   const a_coords = _.chunk(_.flattenDeep(turf.getCoords(geometries[0])), 2);
   const b_coords = _.chunk(_.flattenDeep(turf.getCoords(geometries[1])), 2);
 
@@ -66,16 +66,22 @@ export function getPolygon(geometries: [TmcFeature, TmcFeature]) {
 
   const line = turf.lineString(combined_coords);
 
+  const tmc = geometries[0].properties!.tmc;
+
   const polygon = turf.lineToPolygon(line) as turf.Feature<
     turf.Polygon,
     turf.Properties
   >;
 
-  const tmc = geometries[0].properties!.tmc;
-
   polygon.properties = { tmc };
 
-  return polygon;
+  const { features: polygons } = turf.unkinkPolygon(polygon);
+
+  for (const poly of polygons) {
+    poly.properties = { tmc };
+  }
+
+  return polygons;
 }
 
 export function mapboxDiffLayersReducer(
@@ -229,7 +235,7 @@ function getSourceAndLayerNames(layer_id: LayerID) {
       a_only: `${a_only}::layer`,
       b_only: `${b_only}::layer`,
       inxtn_polygons_fill: `${inxtn_polygons}::fill::layer`,
-      inxtn_polygons_outline: `${inxtn_polygons}::outline::layer`,
+      // inxtn_polygons_outline: `${inxtn_polygons}::outline::layer`,
     },
   };
 }
@@ -256,6 +262,9 @@ export function MapboxDiffLayerForm({
     layer_offset,
     layer_visible,
   } = layer_meta;
+
+  const now = new Date();
+  console.log(now);
 
   const { cells } = useContext(CellsContext);
 
@@ -402,6 +411,7 @@ export function MapboxDiffLayerForm({
     );
 
     function updateHoveredTmc(e: any) {
+      console.log(now);
       const tmc = (e && e.features && e.features?.[0]?.properties?.tmc) || null;
 
       console.log("==> tmc", tmc);
@@ -469,15 +479,16 @@ export function MapboxDiffLayerForm({
     const a_and_b_tmcs = _.intersection(a_tmcs, b_tmcs);
 
     const intxn_polygons = a_and_b_tmcs.map((tmc) =>
-      getPolygon([layer_a_features_by_tmc[tmc], layer_b_features_by_tmc[tmc]])
+      getPolygons([layer_a_features_by_tmc[tmc], layer_b_features_by_tmc[tmc]])
     );
 
-    const intxn_polygons_feature_collection =
-      turf.featureCollection(intxn_polygons);
+    const intxn_polygons_feature_collection = turf.featureCollection(
+      _.flatten(intxn_polygons)
+    );
 
     try {
       map.removeLayer(names.layers.inxtn_polygons_fill);
-      map.removeLayer(names.layers.inxtn_polygons_outline);
+      // map.removeLayer(names.layers.inxtn_polygons_outline);
       map.removeSource(names.sources.inxtn_polygons);
     } catch (err) {}
 
@@ -498,18 +509,18 @@ export function MapboxDiffLayerForm({
       },
     });
 
-    map.addLayer({
-      id: names.layers.inxtn_polygons_outline,
-      type: "line",
-      source: names.sources.inxtn_polygons,
-      layout: {},
-      paint: {
-        // "line-color": "#000000",
-        "line-color": "#f3f700",
-        "line-width": 1,
-        // "line-offset": layer_offset * 2,
-      },
-    });
+    // map.addLayer({
+    // id: names.layers.inxtn_polygons_outline,
+    // type: "line",
+    // source: names.sources.inxtn_polygons,
+    // layout: {},
+    // paint: {
+    // // "line-color": "#000000",
+    // "line-color": "#f3f700",
+    // "line-width": 1,
+    // // "line-offset": layer_offset * 2,
+    // },
+    // });
 
     const a_intxn_feature_collection = turf.featureCollection(
       a_and_b_tmcs.map((tmc) => layer_a_features_by_tmc[tmc])
@@ -520,6 +531,7 @@ export function MapboxDiffLayerForm({
       data: a_intxn_feature_collection,
     });
 
+    // https://stackoverflow.com/a/49924026
     map.addLayer({
       id: names.layers.a_intxn,
       type: "line",
@@ -530,8 +542,8 @@ export function MapboxDiffLayerForm({
       },
       paint: {
         "line-color": "#f3f700",
-        "line-width": 2,
-        // "line-offset": layer_offset,
+        "line-width": 3,
+        "line-dasharray": [6, 3],
       },
     });
 
@@ -559,8 +571,8 @@ export function MapboxDiffLayerForm({
       },
       paint: {
         "line-color": "#f3f700",
-        "line-width": 2,
-        // "line-offset": layer_offset * 2,
+        "line-width": 3,
+        "line-dasharray": [2, 2],
       },
     });
 
