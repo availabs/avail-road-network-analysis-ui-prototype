@@ -28,6 +28,8 @@ import { CellID, CellType } from "../domain";
 
 import CellsContext from "../CellsContext";
 
+import { API_URL } from "../../config/api";
+
 export type LayerID = string;
 
 export type LayerMeta = {
@@ -374,8 +376,7 @@ export function MapboxDiffLayerForm({
           console.log(dependency_cells_meta);
 
           const response = await fetch(
-            // "http://127.0.0.1:3369/dama-admin/dama_dev_1/data-types/npmrds/network-analysis/getTmcFeatures",
-            "http://192.168.1.100:3369/dama-admin/dama_dev_1/data-types/npmrds/network-analysis/getTmcFeatures",
+            `${API_URL}/dama-admin/dama_dev_1/data-types/npmrds/network-analysis/getTmcFeatures`,
             {
               method: "POST", // *GET, POST, PUT, DELETE, etc.
               headers: {
