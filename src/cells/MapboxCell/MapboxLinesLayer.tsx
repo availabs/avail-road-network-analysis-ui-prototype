@@ -3,6 +3,7 @@ import { useContext, useEffect } from "react";
 import { produce, Draft } from "immer";
 import _ from "lodash";
 import { Map } from "mapbox-gl"; // eslint-disable-line import/no-webpack-loader-syntax
+import * as turf from "@turf/turf";
 
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
@@ -16,6 +17,8 @@ import CardContent from "@mui/material/CardContent";
 import TextField from "@mui/material/TextField";
 
 import { HuePicker } from "react-color";
+
+import getTmcFeatures from "../../api/getTmcFeatures";
 
 import AbstractCellState, {
   reducer as abstractMapCellReducer,
@@ -73,7 +76,6 @@ export function mapboxLinesLayersReducer(
   const { type, payload } = action;
 
   if (type === CellActionType.ADD_LAYER) {
-    console.log("==> CellActionType.ADD_LAYER");
     return cell.addLayer(payload);
   }
 
@@ -318,10 +320,15 @@ export function MapboxLinesLayerForm({
 
     dependency_cells_meta.reverse();
 
-    console.log(dependency_cells_meta);
+    const [
+      {
+        // @ts-ignore
+        descriptor: { year },
+      },
+    ] = dependency_cells_meta;
 
     const response = await fetch(
-      `${API_URL}/data-types/npmrds/network-analysis/getTmcFeatures`,
+      `${API_URL}/data-types/npmrds/network-analysis/getTmcs`,
       {
         method: "POST", // *GET, POST, PUT, DELETE, etc.
         headers: {
@@ -335,7 +342,11 @@ export function MapboxLinesLayerForm({
       }
     );
 
-    const feature_collection = await response.json();
+    const tmcs = await response.json();
+
+    const features = await getTmcFeatures(year, tmcs);
+
+    const feature_collection = turf.featureCollection(Object.values(features));
 
     try {
       map.removeLayer(layer_id);
@@ -405,7 +416,6 @@ export function MapboxLinesLayerForm({
               label="Dependency Map"
               onChange={(event: SelectChangeEvent) => {
                 const selected_cell_id = +event.target.value;
-                console.log("LayerForm =>", selected_cell_id);
                 dispatchDependencyChange(selected_cell_id);
               }}
             >
@@ -420,7 +430,6 @@ export function MapboxLinesLayerForm({
                   <HuePicker
                     color={line_color}
                     onChangeComplete={(color) => {
-                      console.log(line_color);
                       dispatchColorChange(color.hex);
                     }}
                   />

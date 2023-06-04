@@ -29,6 +29,7 @@ import { CellID, CellType } from "../domain";
 import CellsContext from "../CellsContext";
 
 import { API_URL } from "../../config/api";
+import getTmcFeatures from "../../api/getTmcFeatures";
 
 export type LayerID = string;
 
@@ -93,7 +94,6 @@ export function mapboxDiffLayersReducer(
   const { type, payload } = action;
 
   if (type === CellActionType.ADD_LAYER) {
-    console.log("==> CellActionType.ADD_LAYER");
     return cell.addLayer(payload);
   }
 
@@ -346,8 +346,6 @@ export function MapboxDiffLayerForm({
     });
 
   async function fetchTmcs() {
-    console.log("FETCH TMCS");
-
     const feature_collections = await Promise.all(
       [layer_dependency_id_a, layer_dependency_id_b].map(
         async (layer_dependency_id) => {
@@ -382,16 +380,20 @@ export function MapboxDiffLayerForm({
 
           dependency_cells_meta.reverse();
 
-          console.log(dependency_cells_meta);
+          const [
+            {
+              // @ts-ignore
+              descriptor: { year },
+            },
+          ] = dependency_cells_meta;
 
           const response = await fetch(
-            `${API_URL}/data-types/npmrds/network-analysis/getTmcFeatures`,
+            `${API_URL}/data-types/npmrds/network-analysis/getTmcs`,
             {
               method: "POST", // *GET, POST, PUT, DELETE, etc.
               headers: {
                 "Content-Type": "application/json",
               },
-              // mode: "no-cors",
               body: JSON.stringify({
                 dependency: layer_dependency_id,
                 dependency_cells_meta,
@@ -399,11 +401,13 @@ export function MapboxDiffLayerForm({
             }
           );
 
-          const feature_collection =
-            (await response.json()) as turf.FeatureCollection<
-              turf.MultiLineString,
-              turf.Properties
-            >;
+          const tmcs = await response.json();
+
+          const features = await getTmcFeatures(year, tmcs);
+
+          const feature_collection = turf.featureCollection(
+            Object.values(features)
+          );
 
           return feature_collection;
         }
@@ -686,7 +690,6 @@ export function MapboxDiffLayerForm({
               label="Dependency Map"
               onChange={(event: SelectChangeEvent) => {
                 const selected_cell_id = +event.target.value;
-                console.log("LayerForm =>", selected_cell_id);
                 dispatchLayerDependencyAChange(selected_cell_id);
               }}
             >
@@ -708,7 +711,6 @@ export function MapboxDiffLayerForm({
               label="Dependency Map"
               onChange={(event: SelectChangeEvent) => {
                 const selected_cell_id = +event.target.value;
-                console.log("LayerForm =>", selected_cell_id);
                 dispatchLayerDependencyBChange(selected_cell_id);
               }}
             >
