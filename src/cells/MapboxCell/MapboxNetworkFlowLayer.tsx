@@ -1,4 +1,4 @@
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useState } from "react";
 
 import { produce, Draft } from "immer";
 import _ from "lodash";
@@ -67,11 +67,27 @@ export type CellAction = {
   payload: any;
 };
 
-export function mapboxLinesLayersReducer(
-  cell: MapboxLinesLayerState,
+function getSourceAndLayerNames(layer_id: LayerID) {
+  const lines = `${layer_id}::lines`;
+  const points = `${layer_id}::points`;
+
+  return {
+    sources: {
+      lines: `${lines}::source`,
+      points: `${points}::source`,
+    },
+    layers: {
+      lines: `${lines}::layer`,
+      points: `${points}::layer`,
+    },
+  };
+}
+
+export function mapboxNetworkFlowLayersReducer(
+  cell: MapboxNetworkFlowLayerState,
   action: CellAction
 ) {
-  cell = abstractMapCellReducer(cell, action) as MapboxLinesLayerState;
+  cell = abstractMapCellReducer(cell, action) as MapboxNetworkFlowLayerState;
 
   const { type, payload } = action;
 
@@ -107,7 +123,7 @@ export function mapboxLinesLayersReducer(
   return cell;
 }
 
-export class MapboxLinesLayerState extends AbstractCellState {
+export class MapboxNetworkFlowLayerState extends AbstractCellState {
   readonly _descriptor: {
     layers: LayerMeta[];
   };
@@ -143,6 +159,8 @@ export class MapboxLinesLayerState extends AbstractCellState {
       if (has_layer) {
         return;
       }
+
+      console.log("\n\n===> MapboxNetworkFlowLayer addLayer\n\n");
 
       draft._descriptor.layers.push({
         layer_id,
@@ -208,7 +226,7 @@ export class MapboxLinesLayerState extends AbstractCellState {
   }
 }
 
-export function MapboxLinesLayerForm({
+export function MapboxNetworkFlowLayerForm({
   this_cell_id,
   layer_meta,
   dispatch,
@@ -226,6 +244,9 @@ export function MapboxLinesLayerForm({
     layer_visible,
   } = layer_meta;
 
+  const [points_animation_interval, setPointsAnimationInterval] =
+    useState(null);
+
   const { cells } = useContext(CellsContext);
 
   const this_cell = cells[this_cell_id];
@@ -235,16 +256,24 @@ export function MapboxLinesLayerForm({
       return;
     }
 
-    map.setLayoutProperty(
-      layer_id,
-      "visibility",
-      layer_visible ? "visible" : "none"
-    );
+    const { layers } = getSourceAndLayerNames(layer_id);
+
+    for (const layer_id of Object.values(layers)) {
+      try {
+        map.setLayoutProperty(
+          layer_id,
+          "visibility",
+          layer_visible ? "visible" : "none"
+        );
+      } catch (err) {}
+    }
   }, [map, layer_visible, layer_id]);
 
+  console.log("\n\n===== 1 =====\n\n");
   if (!this_cell) {
     return null;
   }
+  console.log("\n\n===== 2 =====\n\n");
 
   const dispatchDependencyChange = (layer_dependency_id: number) =>
     dispatch({
@@ -291,6 +320,7 @@ export function MapboxLinesLayerForm({
     });
 
   async function fetchTmcs() {
+    console.log("\n\nFETCH TMCS\n\n");
     const dependency_cells_meta = [cells[layer_dependency_id as number].meta];
 
     const seen_cell_ids = new Set([layer_dependency_id]);
@@ -344,34 +374,135 @@ export function MapboxLinesLayerForm({
 
     const tmcs = await response.json();
 
-    const features = await getTmcFeatures(year, tmcs);
+    const line_features = (await getTmcFeatures(year, tmcs)).map((feature) =>
+      turf.lineOffset(feature, +line_offset / 3, {
+        units: "yards",
+      })
+    );
 
-    const feature_collection = turf.featureCollection(features);
+    const names = getSourceAndLayerNames(layer_id);
 
-    try {
-      map.removeLayer(layer_id);
-      map.removeSource(layer_id);
-    } catch (err) {}
+    for (const layer_id of Object.values(names.layers)) {
+      try {
+        map.removeLayer(layer_id);
+        // map.off("mousemove", layer_id, updateHoveredTmc);
+        // map.off("mouseleave", layer_id, updateHoveredTmc);
+      } catch (err) {}
+    }
 
-    map.addSource(layer_id, {
+    for (const source_id of Object.values(names.sources)) {
+      try {
+        map.removeSource(source_id);
+      } catch (err) {}
+    }
+
+    const lines_feature_collection = turf.featureCollection(line_features);
+
+    map.addSource(names.sources.lines, {
       type: "geojson",
-      data: feature_collection,
+      data: lines_feature_collection,
     });
 
+    // NORMALIZE AADT/mile
+    //    It would be great to represent AADT as points per mile.
+    //    High traffic roads would have more points per mile.
+
     map.addLayer({
-      id: layer_id,
+      id: names.layers.lines,
       type: "line",
-      source: layer_id,
+      source: names.sources.lines,
       layout: {
         "line-join": "round",
         "line-cap": "round",
       },
       paint: {
         "line-color": line_color,
-        "line-width": +line_width,
-        "line-offset": +line_offset,
+        // "line-width": 3,
+        // "line-offset": layer_offset,
       },
     });
+
+    // @ts-ignore
+    clearInterval(points_animation_interval);
+
+    const point_features = _.flattenDeep(
+      Object.values(line_features).map((feature) =>
+        // Start point. NOTE: TMCs are MultiLineStrings. Geometries are Position[][].
+        feature.geometry.coordinates.map((line_coords) => {
+          const line = turf.lineString(line_coords);
+          const chunked = turf.lineChunk(line, 0.05, { units: "miles" });
+          return chunked.features.map((line) =>
+            turf.point(turf.getCoords(turf.getCoords(line))[0])
+          );
+        })
+      )
+    );
+
+    const points_feature_collection = turf.featureCollection(
+      point_features
+    ) as turf.FeatureCollection<turf.Point>;
+
+    console.log({ point_features });
+
+    map.addSource(names.sources.points, {
+      type: "geojson",
+      data: points_feature_collection,
+    });
+
+    map.addLayer({
+      id: names.layers.points,
+      type: "circle",
+      source: names.sources.points,
+      paint: {
+        "circle-radius": {
+          base: 1.75,
+          stops: [
+            [12, 2],
+            [22, 60],
+          ],
+        },
+        "circle-color": line_color,
+      },
+    });
+
+    let step = 0;
+    const new_pts_animation_interval = setInterval(() => {
+      const pts = _.flattenDeep(
+        Object.values(line_features).map((feature) =>
+          // Start point. NOTE: TMCs are MultiLineStrings. Geometries are Position[][].
+          feature.geometry.coordinates.map((line_coords) => {
+            const line = turf.lineString(line_coords);
+            const line_len = turf.length(line, { units: "miles" });
+            const line_slice = turf.lineSliceAlong(
+              line,
+              Math.min((step % 10) * 0.01, line_len),
+              line_len,
+              { units: "miles" }
+            );
+
+            const chunked = turf.lineChunk(line_slice, 0.05, {
+              units: "miles",
+            });
+
+            return chunked.features.map((line) =>
+              turf.point(turf.getCoords(turf.getCoords(line))[0])
+            );
+          })
+        )
+      );
+
+      const pts_feature_collection = turf.featureCollection(pts);
+
+      requestAnimationFrame(() =>
+        // @ts-ignore
+        map.getSource(names.sources.points).setData(pts_feature_collection)
+      );
+
+      ++step;
+    }, 200);
+
+    // @ts-ignore
+    setPointsAnimationInterval(new_pts_animation_interval as Timer);
 
     if (!layer_visible) {
       dispatchToggleLayerVisibility();

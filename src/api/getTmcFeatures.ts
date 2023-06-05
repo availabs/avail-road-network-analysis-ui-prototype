@@ -1,6 +1,7 @@
 import { LRUCache } from "lru-cache";
 import difference from "lodash/difference";
 import turf from "@turf/turf";
+import _ from "lodash";
 
 import { API_URL } from "../config/api";
 
@@ -17,7 +18,7 @@ const cache: LRUCache<string, TmcFeature> = new LRUCache(options);
 export default async function getTmcFeatures(
   year: number,
   tmcs: string[]
-): Promise<TmcFeaturesByID> {
+): Promise<TmcFeature[]> {
   const keys = tmcs.map((tmc) => `${year}::${tmc}`);
 
   const cache_hit_features_by_id = keys
@@ -60,5 +61,7 @@ export default async function getTmcFeatures(
     cache.set(k, feature);
   });
 
-  return tmc_features_by_id;
+  return _.cloneDeep(
+    tmcs.map((tmc) => tmc_features_by_id[tmc]).filter(Boolean)
+  );
 }

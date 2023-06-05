@@ -405,9 +405,7 @@ export function MapboxDiffLayerForm({
 
           const features = await getTmcFeatures(year, tmcs);
 
-          const feature_collection = turf.featureCollection(
-            Object.values(features)
-          );
+          const feature_collection = turf.featureCollection(features);
 
           return feature_collection;
         }
@@ -490,11 +488,11 @@ export function MapboxDiffLayerForm({
       _.flatten(intxn_polygons)
     );
 
-    try {
-      map.removeLayer(names.layers.inxtn_polygons_fill);
-      // map.removeLayer(names.layers.inxtn_polygons_outline);
-      map.removeSource(names.sources.inxtn_polygons);
-    } catch (err) {}
+    // try {
+    // map.removeLayer(names.layers.inxtn_polygons_fill);
+    // // map.removeLayer(names.layers.inxtn_polygons_outline);
+    // map.removeSource(names.sources.inxtn_polygons);
+    // } catch (err) {}
 
     map.addSource(names.sources.inxtn_polygons, {
       type: "geojson",

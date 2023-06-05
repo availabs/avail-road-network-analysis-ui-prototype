@@ -24,6 +24,13 @@ import {
   CellActionType as DiffLayerCellActionType,
 } from "./MapboxDiffLayer";
 
+import {
+  MapboxNetworkFlowLayerState,
+  MapboxNetworkFlowLayerForm,
+  mapboxNetworkFlowLayersReducer,
+  CellActionType as NetworkFlowLayerCellActionType,
+} from "./MapboxNetworkFlowLayer";
+
 mapboxgl.accessToken = mapbox_token;
 
 const map_initial_state = {
@@ -51,12 +58,23 @@ export default function MapboxCell() {
     new MapboxDiffLayerState()
   );
 
+  const [network_flow_layers_state, networkFlowLayerDispatch] = useReducer(
+    mapboxNetworkFlowLayersReducer,
+    new MapboxNetworkFlowLayerState()
+  );
+
   const { updateCellState } = useContext(CellsContext);
 
   useEffect(() => {
     updateCellState(lines_layers_state);
     updateCellState(diff_layers_state);
-  }, [lines_layers_state, diff_layers_state, updateCellState]);
+    updateCellState(network_flow_layers_state);
+  }, [
+    lines_layers_state,
+    diff_layers_state,
+    network_flow_layers_state,
+    updateCellState,
+  ]);
 
   const {
     cell_id: lines_cell_id,
@@ -67,6 +85,11 @@ export default function MapboxCell() {
     cell_id: diffs_cell_id,
     descriptor: { layers: diff_layers },
   } = diff_layers_state;
+
+  const {
+    cell_id: network_flow_cell_id,
+    descriptor: { layers: network_flow_layers },
+  } = network_flow_layers_state;
 
   useEffect(() => {
     if (map.current) {
@@ -107,14 +130,28 @@ export default function MapboxCell() {
       ))
     : "";
 
+  const NetworkFlowLayerForms = map.current
+    ? network_flow_layers.map((layer_meta) => (
+        <MapboxNetworkFlowLayerForm
+          this_cell_id={network_flow_cell_id}
+          layer_meta={layer_meta}
+          dispatch={networkFlowLayerDispatch}
+          map={map.current!}
+        />
+      ))
+    : "";
+
   // The links at the bottom of the map: https://docs.mapbox.com/help/getting-started/attribution/
   return (
     <div>
       <Typography variant="h4" gutterBottom>
         Mapbox Cell
       </Typography>
+
       {LineLayerForms}
       {DiffLayerForms}
+      {NetworkFlowLayerForms}
+
       <div style={{ padding: 10 }}>
         <span style={{ padding: 10 }}>
           <Button
@@ -143,6 +180,21 @@ export default function MapboxCell() {
             }
           >
             Add Diff Layer
+          </Button>
+        </span>
+
+        <span style={{ padding: 10 }}>
+          <Button
+            variant="contained"
+            color="success"
+            onClick={() =>
+              networkFlowLayerDispatch({
+                type: NetworkFlowLayerCellActionType.ADD_LAYER,
+                payload: uuid(),
+              })
+            }
+          >
+            Add Network Flow Layer
           </Button>
         </span>
       </div>
