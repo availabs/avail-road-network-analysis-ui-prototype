@@ -1,3 +1,7 @@
+// https://stackoverflow.com/questions/60043907/how-to-drag-drop-material-ui-cards
+// https://github.com/atlassian/react-beautiful-dnd
+// https://github.com/react-dnd/react-dnd/
+
 import { useState } from "react";
 
 import Container from "@mui/material/Container";
