@@ -33,6 +33,7 @@ export function mapboxDiffLayersReducer(
   const { type, payload } = action;
 
   if (type === CellActionType.ADD_LAYER) {
+    console.log("\n\n", "==> mapboxDiffLayersReducer", type, "\n\n");
     return cell.addLayer(payload);
   }
 

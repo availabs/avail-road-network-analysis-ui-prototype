@@ -6,17 +6,17 @@ type TMC = string;
 
 const hovered_tmcs_atom = atom<TMC[] | null>({
   key: "atomic_hovered_tmcs",
-  default: null,
+  default: [],
 });
 
-const selecte_tmcs_atom = atom<TMC[] | null>({
+const selected_tmcs_atom = atom<TMC[] | null>({
   key: "atomic_selected_tmcs",
-  default: null,
+  default: [],
 });
 
 export default function useTmcsState() {
   const [hovered_tmcs, setHoveredTmcs] = useRecoilState(hovered_tmcs_atom);
-  const [selected_tmcs, setSelectedTmcs] = useRecoilState(selecte_tmcs_atom);
+  const [selected_tmcs, setSelectedTmcs] = useRecoilState(selected_tmcs_atom);
 
   const ref = useRef({
     hovered_tmcs,

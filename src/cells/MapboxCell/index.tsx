@@ -107,6 +107,7 @@ export default function MapboxCell() {
   const LineLayerForms = map.current
     ? lines_layers.map((layer_meta) => (
         <MapboxLinesLayerForm
+          key={`mapbox_lines_layer_form_${lines_cell_id}`}
           this_cell_id={lines_cell_id}
           layer_meta={layer_meta}
           dispatch={linesLayerDispatch}
@@ -118,6 +119,7 @@ export default function MapboxCell() {
   const DiffLayerForms = map.current
     ? diff_layers.map((layer_meta) => (
         <MapboxDiffLayerForm
+          key={`mapbox_diff_layer_form_${lines_cell_id}`}
           this_cell_id={diffs_cell_id}
           layer_meta={layer_meta}
           dispatch={diffLayerDispatch}
@@ -129,6 +131,7 @@ export default function MapboxCell() {
   const NetworkFlowLayerForms = map.current
     ? network_flow_layers.map((layer_meta) => (
         <MapboxNetworkFlowLayerForm
+          key={`mapbox_network_flow_layer_form_${lines_cell_id}`}
           this_cell_id={network_flow_cell_id}
           layer_meta={layer_meta}
           dispatch={networkFlowLayerDispatch}

@@ -69,9 +69,6 @@ export function MapboxDiffLayerForm({
     layer_visible,
   } = layer_meta;
 
-  // const now = new Date();
-  // console.log(now);
-
   const [
     { sources: source_names, layers: layer_names },
     setSourceAndLayerNames,
@@ -171,11 +168,13 @@ export function MapboxDiffLayerForm({
 
     for (const layer_id of Object.values(layers)) {
       try {
-        map.setLayoutProperty(
-          layer_id,
-          "visibility",
-          layer_visible ? "visible" : "none"
-        );
+        if (map.getLayer(layer_id)) {
+          map.setLayoutProperty(
+            layer_id,
+            "visibility",
+            layer_visible ? "visible" : "none"
+          );
+        }
       } catch (err) {}
     }
   }, [map, layer_id, layer_visible]);
@@ -193,7 +192,9 @@ export function MapboxDiffLayerForm({
 
     for (const layer_id of Object.values(layer_names)) {
       try {
-        map.setFilter(layer_id, filter);
+        if (map.getLayer(layer_id)) {
+          map.setFilter(layer_id, filter);
+        }
       } catch (err) {}
     }
   }, [map, layer_names, hovered_tmcs, selected_tmcs]);
@@ -211,6 +212,9 @@ export function MapboxDiffLayerForm({
   }, [selected_tmcs, year_a, year_b]);
 
   if (!this_cell) {
+    console.log("===\n".repeat(3));
+    console.log({ cells, this_cell_id, this_cell });
+    console.log("===\n".repeat(3));
     return null;
   }
 
@@ -291,7 +295,9 @@ export function MapboxDiffLayerForm({
 
     for (const layer_id of Object.values(layer_names)) {
       try {
-        map.removeLayer(layer_id);
+        if (map.getLayer(layer_id)) {
+          map.removeLayer(layer_id);
+        }
       } catch (err) {
         console.error(err);
       }
@@ -299,7 +305,9 @@ export function MapboxDiffLayerForm({
 
     for (const source_id of Object.values(source_names)) {
       try {
-        map.removeSource(source_id);
+        if (map.getSource(source_id)) {
+          map.removeSource(source_id);
+        }
       } catch (err) {
         console.error(err);
       }
@@ -319,12 +327,6 @@ export function MapboxDiffLayerForm({
       _.flatten(intxn_polygons)
     );
 
-    // try {
-    // map.removeLayer(layer_names.inxtn_polygons_fill);
-    // // map.removeLayer(layer_names.inxtn_polygons_outline);
-    // map.removeSource(source_names.inxtn_polygons);
-    // } catch (err) {}
-
     map.addSource(source_names.inxtn_polygons, {
       type: "geojson",
       data: intxn_polygons_feature_collection,
@@ -341,19 +343,6 @@ export function MapboxDiffLayerForm({
         // "line-offset": layer_offset * 2,
       },
     });
-
-    // map.addLayer({
-    // id: layer_names.inxtn_polygons_outline,
-    // type: "line",
-    // source: source_names.inxtn_polygons,
-    // layout: {},
-    // paint: {
-    // // "line-color": "#000000",
-    // "line-color": "#f3f700",
-    // "line-width": 1,
-    // // "line-offset": layer_offset * 2,
-    // },
-    // });
 
     const a_intxn_feature_collection = turf.featureCollection(
       a_and_b_tmcs.map((tmc) => layer_a_features_by_tmc[tmc])
@@ -384,11 +373,6 @@ export function MapboxDiffLayerForm({
       a_and_b_tmcs.map((tmc) => layer_b_features_by_tmc[tmc])
     );
 
-    try {
-      map.removeLayer(layer_names.b_intxn);
-      map.removeSource(source_names.b_intxn);
-    } catch (err) {}
-
     map.addSource(source_names.b_intxn, {
       type: "geojson",
       data: b_intxn_feature_collection,
@@ -416,11 +400,6 @@ export function MapboxDiffLayerForm({
       a_only_tmcs.map((tmc) => layer_a_features_by_tmc[tmc])
     );
 
-    try {
-      map.removeLayer(layer_names.a_only);
-      map.removeSource(source_names.a_only);
-    } catch (err) {}
-
     map.addSource(source_names.a_only, {
       type: "geojson",
       data: a_only_feature_collection,
@@ -447,11 +426,6 @@ export function MapboxDiffLayerForm({
     const b_only_feature_collection = turf.featureCollection(
       b_only_tmcs.map((tmc) => layer_b_features_by_tmc[tmc])
     );
-
-    try {
-      map.removeLayer(layer_names.b_only);
-      map.removeSource(source_names.b_only);
-    } catch (err) {}
 
     map.addSource(source_names.b_only, {
       type: "geojson",
