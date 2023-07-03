@@ -16,6 +16,8 @@ import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import TextField from "@mui/material/TextField";
 
+import years from "../../../constants/years";
+
 import useTmcsState from "../../../state/tmcs_ui";
 
 import AbstractMapCellState from "../../AbstractMapCellState";
@@ -69,6 +71,9 @@ export function MapboxDiffLayerForm({
     layer_visible,
   } = layer_meta;
 
+  const [map_year_a, setMapYearA] = useState(_.first(years));
+  const [map_year_b, setMapYearB] = useState(_.last(years));
+
   const [
     { sources: source_names, layers: layer_names },
     setSourceAndLayerNames,
@@ -82,10 +87,6 @@ export function MapboxDiffLayerForm({
 
   const { hovered_tmcs, selected_tmcs, setHoveredTmcs, setSelectedTmcs } =
     useTmcsState();
-
-  useEffect(() => {
-    console.log({ hovered_tmcs, selected_tmcs });
-  }, [hovered_tmcs, selected_tmcs]);
 
   const hovered_tmcs_ref = useRef(hovered_tmcs);
   hovered_tmcs_ref.current = hovered_tmcs;
@@ -202,14 +203,18 @@ export function MapboxDiffLayerForm({
   useEffect(() => {
     (async () => {
       const new_tmc_description = await getTmcNetworkDescription(
-        year_a,
-        year_b,
+        // @ts-ignore
+        map_year_a,
+        // @ts-ignore
+        map_year_b,
         selected_tmcs?.[0] || null
       );
 
+      console.log(new_tmc_description);
+
       setTmcDescription(new_tmc_description);
     })();
-  }, [selected_tmcs, year_a, year_b]);
+  }, [selected_tmcs, map_year_a, map_year_b]);
 
   if (!this_cell) {
     console.log("===\n".repeat(3));
@@ -257,7 +262,9 @@ export function MapboxDiffLayerForm({
     const feature_collections = await getTmcFeatureCollections(
       cells,
       layer_dependency_id_a,
-      layer_dependency_id_b
+      map_year_a,
+      layer_dependency_id_b,
+      map_year_b
     );
 
     type TmcFeaturesById = Record<string, TmcFeature>;
@@ -469,6 +476,18 @@ export function MapboxDiffLayerForm({
     .map((cell_state) => [cell_state.cell_id, cell_state.name])
     .sort((a, b) => +a[0] - +b[0]);
 
+  const years_menu_items_a = years.map((year) => (
+    <MenuItem key={`map_year_${year}`} value={year}>
+      {year}
+    </MenuItem>
+  ));
+
+  const years_menu_items_b = years.map((year) => (
+    <MenuItem key={`map_year_${year}`} value={year}>
+      {year}
+    </MenuItem>
+  ));
+
   const dep_map_menu_items = candidate_id_name_pairs.map(
     ([cell_id, cell_name]) => (
       <MenuItem key={`cell_${cell_id}`} value={cell_id}>
@@ -480,10 +499,10 @@ export function MapboxDiffLayerForm({
   return (
     <Box key={layer_id} style={{ paddingBottom: 10 }}>
       <Card sx={{ minWidth: 275 }}>
-        <CardContent>
+        <div>
           <FormControl sx={{ m: 1, minWidth: 300 }}>
             <InputLabel id="demo-simple-select-label">
-              Dependency Map A
+              Dependency Map A Descriptor
             </InputLabel>
             <Select
               labelId="demo-simple-select-label"
@@ -503,8 +522,25 @@ export function MapboxDiffLayerForm({
           </FormControl>
 
           <FormControl sx={{ m: 1, minWidth: 300 }}>
+            <InputLabel id="demo-simple-select-label">Map A Year</InputLabel>
+            <Select
+              labelId="demo-simple-select-label"
+              id="demo-simple-select"
+              value={`${map_year_a}`}
+              label="Map A Year"
+              onChange={(event: SelectChangeEvent) =>
+                setMapYearA(+event.target.value)
+              }
+            >
+              {years_menu_items_a}
+            </Select>
+          </FormControl>
+        </div>
+
+        <div>
+          <FormControl sx={{ m: 1, minWidth: 300 }}>
             <InputLabel id="demo-simple-select-label">
-              Dependency Map B
+              Dependency Map B Descriptor
             </InputLabel>
             <Select
               labelId="demo-simple-select-label"
@@ -523,6 +559,23 @@ export function MapboxDiffLayerForm({
             </FormHelperText>
           </FormControl>
 
+          <FormControl sx={{ m: 1, minWidth: 300 }}>
+            <InputLabel id="demo-simple-select-label">Map B Year</InputLabel>
+            <Select
+              labelId="demo-simple-select-label"
+              id="demo-simple-select"
+              value={`${map_year_b}`}
+              label="Map B Year"
+              onChange={(event: SelectChangeEvent) =>
+                setMapYearB(+event.target.value)
+              }
+            >
+              {years_menu_items_b}
+            </Select>
+          </FormControl>
+        </div>
+
+        <div>
           <FormControl sx={{ m: 1, minWidth: 100 }}>
             <TextField
               required
@@ -547,12 +600,12 @@ export function MapboxDiffLayerForm({
           >
             {layer_visible ? "Hide" : "Show"}
           </Button>
-        </CardContent>
+        </div>
       </Card>
 
       <TmcDescription
-        year_a={year_a}
-        year_b={year_b}
+        year_a={map_year_a as number}
+        year_b={map_year_b as number}
         tmc_description={tmc_description}
       />
     </Box>

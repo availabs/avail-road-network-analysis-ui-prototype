@@ -10,6 +10,8 @@ import { CellLookup } from "../../CellsContext";
 import { Tmc } from "./domain";
 import { CellID } from "../../domain";
 
+import getBaseMapDescriptorForYear from "../../../utils/getBaseMapDescriptorForYear";
+
 export async function getTmcNetworkDescription(
   year_a: number | null,
   year_b: number | null,
@@ -99,72 +101,91 @@ export async function getTmcNetworkDescription(
 export async function getTmcFeatureCollections(
   cells: CellLookup,
   layer_dependency_id_a: CellID | null,
-  layer_dependency_id_b: CellID | null
+  map_year_a: number | undefined,
+  layer_dependency_id_b: CellID | null,
+  map_year_b: number | undefined
 ) {
   const feature_collections = await Promise.all(
-    [layer_dependency_id_a, layer_dependency_id_b].map(
-      async (layer_dependency_id) => {
-        const dependency_cells_meta = [
-          cells[layer_dependency_id as number].meta,
-        ];
+    [
+      [layer_dependency_id_a, map_year_a],
+      [layer_dependency_id_b, map_year_b],
+    ].map(async ([layer_dependency_id, map_year], x) => {
+      let this_cell_meta = cells[layer_dependency_id as number].meta;
 
-        const seen_cell_ids = new Set([layer_dependency_id]);
-        const deep_deps = _.flatten(
-          dependency_cells_meta.map(({ dependencies }) => dependencies)
-        ).filter(Boolean) as CellID[];
+      const this_cell_is_abstract = !this_cell_meta?.dependencies?.length;
 
-        for (let i = 0; i < deep_deps.length; ++i) {
-          const cell_id = deep_deps[i];
+      if (this_cell_is_abstract) {
+        this_cell_meta = { ...this_cell_meta, dependencies: [-(x + 1)] };
+      }
 
-          if (seen_cell_ids.has(cell_id)) {
-            continue;
-          }
+      const dependency_cells_meta = [this_cell_meta];
 
-          const { dependencies: cur_deps, meta } = cells[cell_id];
+      const seen_cell_ids = new Set([layer_dependency_id]);
 
-          dependency_cells_meta.push(meta);
+      const deep_deps = _.flatten(
+        dependency_cells_meta.map(({ dependencies }) => dependencies)
+      ).filter(Boolean) as CellID[];
 
-          if (Array.isArray(cur_deps)) {
-            for (const dep of cur_deps) {
-              if (!seen_cell_ids.has(dep)) {
-                deep_deps.push(dep);
-              }
+      for (let i = 0; i < deep_deps.length; ++i) {
+        const cell_id = deep_deps[i];
+
+        if (seen_cell_ids.has(cell_id)) {
+          continue;
+        }
+
+        const { dependencies: cur_deps, meta } =
+          cell_id !== -(x + 1)
+            ? cells[cell_id]
+            : {
+                dependencies: null,
+                // @ts-ignore
+                meta: getBaseMapDescriptorForYear(map_year, -(x + 1)),
+              };
+
+        dependency_cells_meta.push(meta);
+
+        if (Array.isArray(cur_deps)) {
+          for (const dep of cur_deps) {
+            if (!seen_cell_ids.has(dep)) {
+              deep_deps.push(dep);
             }
           }
         }
-
-        dependency_cells_meta.reverse();
-
-        const [
-          {
-            // @ts-ignore
-            descriptor: { year },
-          },
-        ] = dependency_cells_meta;
-
-        const response = await fetch(
-          `${API_URL}/data-types/npmrds/network-analysis/getTmcs`,
-          {
-            method: "POST", // *GET, POST, PUT, DELETE, etc.
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              dependency: layer_dependency_id,
-              dependency_cells_meta,
-            }), // body data type must match "Content-Type" header
-          }
-        );
-
-        const tmcs = await response.json();
-
-        const features = await getTmcFeatures(year, tmcs);
-
-        const feature_collection = turf.featureCollection(features);
-
-        return feature_collection;
       }
-    )
+
+      dependency_cells_meta.reverse();
+
+      const [
+        {
+          // @ts-ignore
+          descriptor: { year },
+        },
+      ] = dependency_cells_meta;
+
+      console.log(dependency_cells_meta);
+
+      const response = await fetch(
+        `${API_URL}/data-types/npmrds/network-analysis/getTmcs`,
+        {
+          method: "POST", // *GET, POST, PUT, DELETE, etc.
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            dependency: layer_dependency_id,
+            dependency_cells_meta,
+          }), // body data type must match "Content-Type" header
+        }
+      );
+
+      const tmcs = await response.json();
+
+      const features = await getTmcFeatures(year, tmcs);
+
+      const feature_collection = turf.featureCollection(features);
+
+      return feature_collection;
+    })
   );
 
   return feature_collections;

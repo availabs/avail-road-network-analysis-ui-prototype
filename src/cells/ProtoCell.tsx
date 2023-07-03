@@ -11,14 +11,14 @@ import Select, { SelectChangeEvent } from "@mui/material/Select";
 import { CellType } from "./domain";
 import CellsContext from "./CellsContext";
 
-import MapYearCell from "./MapYearCell";
+// import MapYearCell from "./MapYearCell";
 import MapFilterCell from "./MapFilterCell";
 import MapboxCell from "./MapboxCell";
 import MapTraverseCell from "./MapTraverseCell";
 
 // https://stackoverflow.com/a/40896168
 const CellLookup = {
-  [CellType.MapYearCell]: MapYearCell,
+  // [CellType.MapYearCell]: MapYearCell,
   [CellType.MapFilterCell]: MapFilterCell,
   [CellType.MapboxCell]: MapboxCell,
   [CellType.MapTraverseCell]: MapTraverseCell,
@@ -63,7 +63,7 @@ export default function ProtoCell() {
   useEffect(() => {
     if (Object.keys(cells).length === 0) {
       // @ts-ignore
-      setCellType(CellType.MapYearCell);
+      setCellType(CellType.MapFilterCell);
     }
   }, [cells, setCellType]);
 
@@ -73,7 +73,8 @@ export default function ProtoCell() {
   }
 
   if (cell_type) {
-    const Comp: typeof MapYearCell = CellLookup[cell_type];
+    const Comp = CellLookup[cell_type];
+    // @ts-ignore
     elem = <Comp />;
   }
 

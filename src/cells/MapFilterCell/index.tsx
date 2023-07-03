@@ -48,6 +48,7 @@ enum TmcMetadataFilterProperties {
   func_class = "Functional Class",
   is_nhs = "Is NHS",
 }
+
 export function reducer(cell: MapFilterCellState, action: CellAction) {
   let new_cell = abstractMapCellReducer(cell, action) as MapFilterCellState;
 
@@ -217,12 +218,15 @@ function CellForm({
       </div>
       <div>
         <FormControl sx={{ m: 1, minWidth: 300 }}>
-          <InputLabel id="demo-simple-select-label">Dependency Map</InputLabel>
+          <InputLabel id="demo-simple-select-label">
+            {candidate_id_name_pairs.length ? "Dependency Map" : "---"}
+          </InputLabel>
           <Select
             labelId="demo-simple-select-label"
             id="demo-simple-select"
-            value={`${current_dependency_id}`}
+            value={`${current_dependency_id || ""}`}
             label="Dependency Map"
+            disabled={candidate_id_name_pairs.length === 0}
             onChange={(event: SelectChangeEvent) => {
               const selected_cell_id = +event.target.value;
               console.log("CellForm =>", selected_cell_id);
