@@ -47,6 +47,7 @@ enum TmcMetadataFilterProperties {
   direction = "Direction",
   func_class = "Functional Class",
   is_nhs = "Is NHS",
+  zip = "Zip Code",
 }
 
 export function reducer(cell: MapFilterCellState, action: CellAction) {

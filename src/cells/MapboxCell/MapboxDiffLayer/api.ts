@@ -8,7 +8,7 @@ import getTmcFeatures from "../../../api/getTmcFeatures";
 import { CellLookup } from "../../CellsContext";
 
 import { Tmc } from "./domain";
-import { CellID } from "../../domain";
+import { CellID, CellType } from "../../domain";
 
 import getBaseMapDescriptorForYear from "../../../utils/getBaseMapDescriptorForYear";
 
@@ -110,21 +110,19 @@ export async function getTmcFeatureCollections(
       [layer_dependency_id_a, map_year_a],
       [layer_dependency_id_b, map_year_b],
     ].map(async ([layer_dependency_id, map_year], x) => {
-      let this_cell_meta = cells[layer_dependency_id as number].meta;
+      // We use the pseudo_root_cell_id to insert a Map Year cell descriptor if needed.
+      const pseudo_root_cell_id = -(x + 1);
 
-      const this_cell_is_abstract = !this_cell_meta?.dependencies?.length;
+      const dependency_cells_meta: any[] = [];
 
-      if (this_cell_is_abstract) {
-        this_cell_meta = { ...this_cell_meta, dependencies: [-(x + 1)] };
-      }
+      const seen_cell_ids = new Set();
 
-      const dependency_cells_meta = [this_cell_meta];
+      let pushed_pseudo_root = false;
 
-      const seen_cell_ids = new Set([layer_dependency_id]);
-
-      const deep_deps = _.flatten(
-        dependency_cells_meta.map(({ dependencies }) => dependencies)
-      ).filter(Boolean) as CellID[];
+      const deep_deps = _.flatten([
+        layer_dependency_id,
+        ...dependency_cells_meta.map(({ dependencies }) => dependencies),
+      ]).filter(Boolean) as CellID[];
 
       for (let i = 0; i < deep_deps.length; ++i) {
         const cell_id = deep_deps[i];
@@ -133,14 +131,35 @@ export async function getTmcFeatureCollections(
           continue;
         }
 
-        const { dependencies: cur_deps, meta } =
-          cell_id !== -(x + 1)
+        seen_cell_ids.add(cell_id);
+
+        console.log("getTmcFeatureCollections:", {
+          cell_id,
+          pseudo_root_cell_id,
+        });
+
+        let { dependencies: cur_deps, meta } =
+          cell_id !== pseudo_root_cell_id
             ? cells[cell_id]
             : {
                 dependencies: null,
-                // @ts-ignore
-                meta: getBaseMapDescriptorForYear(map_year, -(x + 1)),
+                meta: getBaseMapDescriptorForYear(
+                  map_year as number,
+                  pseudo_root_cell_id
+                ),
               };
+
+        // Is this dependency abstract?
+        if (
+          !meta.dependencies?.length &&
+          meta.cell_type !== CellType.MapYearCell
+        ) {
+          meta = { ...meta, dependencies: [pseudo_root_cell_id] };
+          if (!pushed_pseudo_root) {
+            deep_deps.push(pseudo_root_cell_id);
+            pushed_pseudo_root = true;
+          }
+        }
 
         dependency_cells_meta.push(meta);
 
@@ -154,6 +173,8 @@ export async function getTmcFeatureCollections(
       }
 
       dependency_cells_meta.reverse();
+
+      console.log({ layer_dependency_id, map_year, dependency_cells_meta });
 
       const [
         {
