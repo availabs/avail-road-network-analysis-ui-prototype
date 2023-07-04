@@ -13,7 +13,6 @@ import Select, { SelectChangeEvent } from "@mui/material/Select";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
-import CardContent from "@mui/material/CardContent";
 import TextField from "@mui/material/TextField";
 
 import years from "../../../constants/years";
@@ -37,7 +36,11 @@ import { CellAction, CellActionType } from "./state";
 
 import TmcDescription from "./components/TmcDescription";
 
-import { getTmcNetworkDescription, getTmcFeatureCollections } from "./api";
+import {
+  getTmcNetworkDescription,
+  getTmcFeatureCollections,
+  getNodesForTmcs,
+} from "./api";
 
 import {
   // Tmc,
@@ -297,6 +300,18 @@ export function MapboxDiffLayerForm({
 
       layer_b_features_by_tmc[tmc] = offset;
     }
+
+    const layer_a_tmcs = Object.keys(layer_a_features_by_tmc);
+    const layer_b_tmcs = Object.keys(layer_b_features_by_tmc);
+
+    const [nodes_map_a, nodes_map_b] = await Promise.all([
+      getNodesForTmcs(layer_a_tmcs, map_year_a as number),
+      getNodesForTmcs(layer_b_tmcs, map_year_b as number),
+    ]);
+
+    console.log("=== nodes ".repeat(10));
+    console.log({ nodes_map_a, nodes_map_b });
+    console.log("=== nodes ".repeat(10));
 
     removeAllMapListeners();
 

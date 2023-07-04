@@ -24,8 +24,11 @@ function App() {
 
   return (
     <RecoilRoot>
-      <div style={{ height: "100%", paddingBottom: 100 }} className="App">
-        <Container maxWidth="xl">
+      <div
+        style={{ height: "100%", width: "100%", paddingBottom: 100 }}
+        className="App"
+      >
+        <Container maxWidth={false}>
           <Box sx={{ my: 4 }}>
             <Typography variant="h4" component="h1" gutterBottom>
               AVAIL Road Network Analysis (prototype)
