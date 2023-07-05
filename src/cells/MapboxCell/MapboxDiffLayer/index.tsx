@@ -17,8 +17,6 @@ import TextField from "@mui/material/TextField";
 
 import years from "../../../constants/years";
 
-import useTmcsState from "../../../state/tmcs_ui";
-
 import AbstractMapCellState from "../../AbstractMapCellState";
 import { MapYearCellState } from "../../MapYearCell";
 
@@ -26,21 +24,17 @@ import { CellID } from "../../domain";
 
 import CellsContext from "../../CellsContext";
 
-import {
-  getSourceAndLayerNames,
-  getPolygons,
-  getYearsFromLayerDependencies,
-} from "./utils";
+import { getSourceAndLayerNames, getPolygons } from "./utils";
 
 import { CellAction, CellActionType } from "./state";
 
+import { useMapsMeta, useTmcFeatureCollections } from "./cached_data_state";
+import useTmcsState from "./ui_state";
+import { useProjectedTmcMeta } from "./derived_data_state";
+
 import TmcDescription from "./components/TmcDescription";
 
-import {
-  getTmcNetworkDescription,
-  getTmcFeatureCollections,
-  getNodesForTmcs,
-} from "./api";
+import { getTmcNetworkDescription, getNodesForTmcs } from "./api";
 
 import {
   // Tmc,
@@ -77,6 +71,16 @@ export function MapboxDiffLayerForm({
   const [map_year_a, setMapYearA] = useState(_.first(years));
   const [map_year_b, setMapYearB] = useState(_.last(years));
 
+  const updateMapsMeta = useMapsMeta();
+  const { features_a, features_b } = useTmcFeatureCollections();
+  const { tmc_meta_a, tmc_meta_b } = useProjectedTmcMeta();
+
+  useEffect(() => {
+    console.log("===== TMC Metadta =====");
+    console.log({ tmc_meta_a, tmc_meta_b });
+    console.log("=======================");
+  }, [tmc_meta_a, tmc_meta_b]);
+
   const [
     { sources: source_names, layers: layer_names },
     setSourceAndLayerNames,
@@ -96,8 +100,6 @@ export function MapboxDiffLayerForm({
 
   const handleHover = useCallback(
     (e: any) => {
-      console.log(e);
-      // console.log(now);
       const tmcs =
         e?.features
           ?.map((feature: any) => feature?.properties?.tmc)
@@ -157,11 +159,11 @@ export function MapboxDiffLayerForm({
 
   const this_cell = cells[this_cell_id];
 
-  const [year_a, year_b] = getYearsFromLayerDependencies(
-    cells,
-    layer_dependency_id_a,
-    layer_dependency_id_b
-  );
+  // const [year_a, year_b] = getYearsFromLayerDependencies(
+  // cells,
+  // layer_dependency_id_a,
+  // layer_dependency_id_b
+  // );
 
   useEffect(() => {
     if (!map) {
@@ -219,261 +221,319 @@ export function MapboxDiffLayerForm({
     })();
   }, [selected_tmcs, map_year_a, map_year_b]);
 
+  const dispatchLayerDependencyAChange = useCallback(
+    (cell_id: CellID) =>
+      dispatch({
+        type: CellActionType.SET_LAYER_DEPENDENCY_A,
+        payload: {
+          layer_id,
+          cell_id,
+        },
+      }),
+    [layer_id, dispatch]
+  );
+
+  const dispatchLayerDependencyBChange = useCallback(
+    (cell_id: CellID) =>
+      dispatch({
+        type: CellActionType.SET_LAYER_DEPENDENCY_B,
+        payload: {
+          layer_id,
+          cell_id,
+        },
+      }),
+    [layer_id, dispatch]
+  );
+
+  const dispatchLayerOffsetChange = useCallback(
+    (layer_offset: number) =>
+      dispatch({
+        type: CellActionType.SET_LAYER_OFFSET,
+        payload: {
+          layer_id,
+          layer_offset,
+        },
+      }),
+    [layer_id, dispatch]
+  );
+
+  const dispatchToggleLayerVisibility = useCallback(
+    () =>
+      dispatch({
+        type: CellActionType.TOGGLE_LAYER_VISIBILITY,
+        payload: {
+          layer_id,
+        },
+      }),
+    [layer_id, dispatch]
+  );
+
+  const features_ref = useRef({ features_a, features_b });
+
+  useEffect(() => {
+    (async () => {
+      if (features_a === null || features_b === null) {
+        return;
+      }
+
+      if (
+        features_ref.current.features_a === features_a &&
+        features_ref.current.features_b
+      ) {
+        return;
+      }
+
+      console.log("=== RERENDER MAP ".repeat(3), "===");
+
+      features_ref.current = {
+        features_a,
+        features_b,
+      };
+
+      const feature_collections = [features_a, features_b];
+
+      type TmcFeaturesById = Record<string, TmcFeature>;
+      const layer_a_features_by_tmc: TmcFeaturesById = {};
+
+      for (const feature of feature_collections[0].features) {
+        const {
+          // @ts-ignore
+          properties: { tmc },
+        } = feature;
+
+        // @ts-ignore
+        const offset = turf.lineOffset(feature, +layer_offset / 3, {
+          units: "yards",
+        });
+
+        // @ts-ignore
+        layer_a_features_by_tmc[tmc] = offset;
+      }
+
+      const layer_b_features_by_tmc: TmcFeaturesById = {};
+
+      for (const feature of feature_collections[1].features) {
+        const {
+          // @ts-ignore
+          properties: { tmc },
+        } = feature;
+
+        // @ts-ignore
+        const offset = turf.lineOffset(feature, (+layer_offset * 2) / 3, {
+          units: "yards",
+        });
+
+        // @ts-ignore
+        layer_b_features_by_tmc[tmc] = offset;
+      }
+
+      const layer_a_tmcs = Object.keys(layer_a_features_by_tmc);
+      const layer_b_tmcs = Object.keys(layer_b_features_by_tmc);
+
+      const [nodes_map_a, nodes_map_b] = await Promise.all([
+        getNodesForTmcs(layer_a_tmcs, map_year_a as number),
+        getNodesForTmcs(layer_b_tmcs, map_year_b as number),
+      ]);
+
+      console.log("=== nodes ".repeat(10));
+      console.log({ nodes_map_a, nodes_map_b });
+      console.log("=== nodes ".repeat(10));
+
+      removeAllMapListeners();
+
+      for (const layer_id of Object.values(layer_names)) {
+        try {
+          if (map.getLayer(layer_id)) {
+            map.removeLayer(layer_id);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      for (const source_id of Object.values(source_names)) {
+        try {
+          if (map.getSource(source_id)) {
+            map.removeSource(source_id);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      const a_tmcs = Object.keys(layer_a_features_by_tmc);
+      const b_tmcs = Object.keys(layer_b_features_by_tmc);
+
+      // A ∩ B
+      const a_and_b_tmcs = _.intersection(a_tmcs, b_tmcs);
+
+      const intxn_polygons = a_and_b_tmcs.map((tmc) =>
+        getPolygons([
+          layer_a_features_by_tmc[tmc],
+          layer_b_features_by_tmc[tmc],
+        ])
+      );
+
+      const intxn_polygons_feature_collection = turf.featureCollection(
+        _.flatten(intxn_polygons)
+      );
+
+      map.addSource(source_names.inxtn_polygons, {
+        type: "geojson",
+        data: intxn_polygons_feature_collection,
+      });
+
+      map.addLayer({
+        id: layer_names.inxtn_polygons_fill,
+        type: "fill",
+        source: source_names.inxtn_polygons,
+        layout: {},
+        paint: {
+          "fill-color": "#f3f700",
+          "fill-opacity": 0.5,
+          // "line-offset": layer_offset * 2,
+        },
+      });
+
+      const a_intxn_feature_collection = turf.featureCollection(
+        a_and_b_tmcs.map((tmc) => layer_a_features_by_tmc[tmc])
+      );
+
+      map.addSource(source_names.a_intxn, {
+        type: "geojson",
+        data: a_intxn_feature_collection,
+      });
+
+      // https://stackoverflow.com/a/49924026
+      map.addLayer({
+        id: layer_names.a_intxn,
+        type: "line",
+        source: source_names.a_intxn,
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: {
+          "line-color": "#f3f700",
+          "line-width": 3,
+          "line-dasharray": [6, 3],
+        },
+      });
+
+      const b_intxn_feature_collection = turf.featureCollection(
+        a_and_b_tmcs.map((tmc) => layer_b_features_by_tmc[tmc])
+      );
+
+      map.addSource(source_names.b_intxn, {
+        type: "geojson",
+        data: b_intxn_feature_collection,
+      });
+
+      map.addLayer({
+        id: layer_names.b_intxn,
+        type: "line",
+        source: source_names.b_intxn,
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: {
+          "line-color": "#f3f700",
+          "line-width": 3,
+          "line-dasharray": [2, 2],
+        },
+      });
+
+      // A - B
+      const a_only_tmcs = _.difference(a_tmcs, b_tmcs);
+
+      const a_only_feature_collection = turf.featureCollection(
+        a_only_tmcs.map((tmc) => layer_a_features_by_tmc[tmc])
+      );
+
+      map.addSource(source_names.a_only, {
+        type: "geojson",
+        data: a_only_feature_collection,
+      });
+
+      map.addLayer({
+        id: layer_names.a_only,
+        type: "line",
+        source: source_names.a_only,
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: {
+          "line-color": "#ff0000",
+          "line-width": 3,
+          // "line-offset": layer_offset,
+        },
+      });
+
+      // B - A
+      const b_only_tmcs = _.difference(b_tmcs, a_tmcs);
+
+      const b_only_feature_collection = turf.featureCollection(
+        b_only_tmcs.map((tmc) => layer_b_features_by_tmc[tmc])
+      );
+
+      map.addSource(source_names.b_only, {
+        type: "geojson",
+        data: b_only_feature_collection,
+      });
+
+      map.addLayer({
+        id: layer_names.b_only,
+        type: "line",
+        source: source_names.b_only,
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: {
+          "line-color": "#7d7aff",
+          "line-width": 3,
+          // "line-offset": layer_offset * 2,
+        },
+      });
+
+      if (!layer_visible) {
+        dispatchToggleLayerVisibility();
+      }
+
+      addMapListeners();
+    })();
+  }, [
+    features_a,
+    features_b,
+    addMapListeners,
+    dispatchToggleLayerVisibility,
+    layer_names,
+    layer_visible,
+    map,
+    map_year_a,
+    map_year_b,
+    layer_offset,
+    removeAllMapListeners,
+    source_names,
+  ]);
+
+  async function render() {
+    updateMapsMeta(
+      cells,
+      layer_dependency_id_a as CellID,
+      map_year_a as number,
+      layer_dependency_id_b as CellID,
+      map_year_b as number
+    );
+  }
+
   if (!this_cell) {
     console.log("===\n".repeat(3));
     console.log({ cells, this_cell_id, this_cell });
     console.log("===\n".repeat(3));
     return null;
-  }
-
-  const dispatchLayerDependencyAChange = (cell_id: CellID) =>
-    dispatch({
-      type: CellActionType.SET_LAYER_DEPENDENCY_A,
-      payload: {
-        layer_id,
-        cell_id,
-      },
-    });
-
-  const dispatchLayerDependencyBChange = (cell_id: CellID) =>
-    dispatch({
-      type: CellActionType.SET_LAYER_DEPENDENCY_B,
-      payload: {
-        layer_id,
-        cell_id,
-      },
-    });
-
-  const dispatchLayerOffsetChange = (layer_offset: number) =>
-    dispatch({
-      type: CellActionType.SET_LAYER_OFFSET,
-      payload: {
-        layer_id,
-        layer_offset,
-      },
-    });
-
-  const dispatchToggleLayerVisibility = () =>
-    dispatch({
-      type: CellActionType.TOGGLE_LAYER_VISIBILITY,
-      payload: {
-        layer_id,
-      },
-    });
-
-  async function render() {
-    const feature_collections = await getTmcFeatureCollections(
-      cells,
-      layer_dependency_id_a,
-      map_year_a,
-      layer_dependency_id_b,
-      map_year_b
-    );
-
-    type TmcFeaturesById = Record<string, TmcFeature>;
-    const layer_a_features_by_tmc: TmcFeaturesById = {};
-
-    for (const feature of feature_collections[0].features) {
-      const {
-        // @ts-ignore
-        properties: { tmc },
-      } = feature;
-
-      const offset = turf.lineOffset(feature, +layer_offset / 3, {
-        units: "yards",
-      });
-
-      layer_a_features_by_tmc[tmc] = offset;
-    }
-
-    const layer_b_features_by_tmc: TmcFeaturesById = {};
-
-    for (const feature of feature_collections[1].features) {
-      const {
-        // @ts-ignore
-        properties: { tmc },
-      } = feature;
-
-      const offset = turf.lineOffset(feature, (+layer_offset * 2) / 3, {
-        units: "yards",
-      });
-
-      layer_b_features_by_tmc[tmc] = offset;
-    }
-
-    const layer_a_tmcs = Object.keys(layer_a_features_by_tmc);
-    const layer_b_tmcs = Object.keys(layer_b_features_by_tmc);
-
-    const [nodes_map_a, nodes_map_b] = await Promise.all([
-      getNodesForTmcs(layer_a_tmcs, map_year_a as number),
-      getNodesForTmcs(layer_b_tmcs, map_year_b as number),
-    ]);
-
-    console.log("=== nodes ".repeat(10));
-    console.log({ nodes_map_a, nodes_map_b });
-    console.log("=== nodes ".repeat(10));
-
-    removeAllMapListeners();
-
-    for (const layer_id of Object.values(layer_names)) {
-      try {
-        if (map.getLayer(layer_id)) {
-          map.removeLayer(layer_id);
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    for (const source_id of Object.values(source_names)) {
-      try {
-        if (map.getSource(source_id)) {
-          map.removeSource(source_id);
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    const a_tmcs = Object.keys(layer_a_features_by_tmc);
-    const b_tmcs = Object.keys(layer_b_features_by_tmc);
-
-    // A ∩ B
-    const a_and_b_tmcs = _.intersection(a_tmcs, b_tmcs);
-
-    const intxn_polygons = a_and_b_tmcs.map((tmc) =>
-      getPolygons([layer_a_features_by_tmc[tmc], layer_b_features_by_tmc[tmc]])
-    );
-
-    const intxn_polygons_feature_collection = turf.featureCollection(
-      _.flatten(intxn_polygons)
-    );
-
-    map.addSource(source_names.inxtn_polygons, {
-      type: "geojson",
-      data: intxn_polygons_feature_collection,
-    });
-
-    map.addLayer({
-      id: layer_names.inxtn_polygons_fill,
-      type: "fill",
-      source: source_names.inxtn_polygons,
-      layout: {},
-      paint: {
-        "fill-color": "#f3f700",
-        "fill-opacity": 0.5,
-        // "line-offset": layer_offset * 2,
-      },
-    });
-
-    const a_intxn_feature_collection = turf.featureCollection(
-      a_and_b_tmcs.map((tmc) => layer_a_features_by_tmc[tmc])
-    );
-
-    map.addSource(source_names.a_intxn, {
-      type: "geojson",
-      data: a_intxn_feature_collection,
-    });
-
-    // https://stackoverflow.com/a/49924026
-    map.addLayer({
-      id: layer_names.a_intxn,
-      type: "line",
-      source: source_names.a_intxn,
-      layout: {
-        "line-join": "round",
-        "line-cap": "round",
-      },
-      paint: {
-        "line-color": "#f3f700",
-        "line-width": 3,
-        "line-dasharray": [6, 3],
-      },
-    });
-
-    const b_intxn_feature_collection = turf.featureCollection(
-      a_and_b_tmcs.map((tmc) => layer_b_features_by_tmc[tmc])
-    );
-
-    map.addSource(source_names.b_intxn, {
-      type: "geojson",
-      data: b_intxn_feature_collection,
-    });
-
-    map.addLayer({
-      id: layer_names.b_intxn,
-      type: "line",
-      source: source_names.b_intxn,
-      layout: {
-        "line-join": "round",
-        "line-cap": "round",
-      },
-      paint: {
-        "line-color": "#f3f700",
-        "line-width": 3,
-        "line-dasharray": [2, 2],
-      },
-    });
-
-    // A - B
-    const a_only_tmcs = _.difference(a_tmcs, b_tmcs);
-
-    const a_only_feature_collection = turf.featureCollection(
-      a_only_tmcs.map((tmc) => layer_a_features_by_tmc[tmc])
-    );
-
-    map.addSource(source_names.a_only, {
-      type: "geojson",
-      data: a_only_feature_collection,
-    });
-
-    map.addLayer({
-      id: layer_names.a_only,
-      type: "line",
-      source: source_names.a_only,
-      layout: {
-        "line-join": "round",
-        "line-cap": "round",
-      },
-      paint: {
-        "line-color": "#ff0000",
-        "line-width": 3,
-        // "line-offset": layer_offset,
-      },
-    });
-
-    // B - A
-    const b_only_tmcs = _.difference(b_tmcs, a_tmcs);
-
-    const b_only_feature_collection = turf.featureCollection(
-      b_only_tmcs.map((tmc) => layer_b_features_by_tmc[tmc])
-    );
-
-    map.addSource(source_names.b_only, {
-      type: "geojson",
-      data: b_only_feature_collection,
-    });
-
-    map.addLayer({
-      id: layer_names.b_only,
-      type: "line",
-      source: source_names.b_only,
-      layout: {
-        "line-join": "round",
-        "line-cap": "round",
-      },
-      paint: {
-        "line-color": "#7d7aff",
-        "line-width": 3,
-        // "line-offset": layer_offset * 2,
-      },
-    });
-
-    if (!layer_visible) {
-      dispatchToggleLayerVisibility();
-    }
-
-    addMapListeners();
   }
 
   const map_candidates = Object.values(cells).filter((cell_state) => {

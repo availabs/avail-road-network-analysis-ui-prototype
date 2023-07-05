@@ -4,12 +4,12 @@ import { useRef } from "react";
 
 type TMC = string;
 
-const hovered_tmcs_atom = atom<TMC[] | null>({
+export const hovered_tmcs_atom = atom<TMC[] | null>({
   key: "atomic_hovered_tmcs",
   default: [],
 });
 
-const selected_tmcs_atom = atom<TMC[] | null>({
+export const selected_tmcs_atom = atom<TMC[] | null>({
   key: "atomic_selected_tmcs",
   default: [],
 });

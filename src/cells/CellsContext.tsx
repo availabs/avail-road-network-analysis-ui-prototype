@@ -30,14 +30,15 @@ class CellsContextState {
   }
 }
 
-const cells_atom = atom<CellsContextState>({
+export const cells_context_state_atom = atom<CellsContextState>({
   key: "cells_context_state",
   default: new CellsContextState(),
 });
 
 export function useCellsState() {
-  const [cells_context_state, updateCellsContextState] =
-    useRecoilState(cells_atom);
+  const [cells_context_state, updateCellsContextState] = useRecoilState(
+    cells_context_state_atom
+  );
 
   const cells_ref = useRef(cells_context_state);
 

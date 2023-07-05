@@ -10,7 +10,10 @@ const options = {
 };
 
 type TmcFeatureProperties = { tmc: string };
-type TmcFeature = turf.Feature<turf.MultiLineString, TmcFeatureProperties>;
+export type TmcFeature = turf.Feature<
+  turf.MultiLineString,
+  TmcFeatureProperties
+>;
 type TmcFeaturesByID = Record<string, TmcFeature>;
 
 const cache: LRUCache<string, TmcFeature> = new LRUCache(options);

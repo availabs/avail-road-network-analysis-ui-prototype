@@ -1,4 +1,4 @@
-import { useContext, useRef, useEffect, useReducer } from "react";
+import { useContext, useRef, useEffect, useReducer, Suspense } from "react";
 
 import { v4 as uuid } from "uuid";
 
@@ -118,13 +118,15 @@ export default function MapboxCell() {
 
   const DiffLayerForms = map.current
     ? diff_layers.map((layer_meta) => (
-        <MapboxDiffLayerForm
-          key={`mapbox_diff_layer_form_${lines_cell_id}`}
-          this_cell_id={diffs_cell_id}
-          layer_meta={layer_meta}
-          dispatch={diffLayerDispatch}
-          map={map.current!}
-        />
+        <Suspense>
+          <MapboxDiffLayerForm
+            key={`mapbox_diff_layer_form_${lines_cell_id}`}
+            this_cell_id={diffs_cell_id}
+            layer_meta={layer_meta}
+            dispatch={diffLayerDispatch}
+            map={map.current!}
+          />
+        </Suspense>
       ))
     : "";
 
