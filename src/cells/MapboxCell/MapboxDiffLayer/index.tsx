@@ -32,13 +32,14 @@ import {
   useMapYears,
   useMapsMeta,
   useTmcFeatureCollections,
+  useTmcLinearPathsMetadata,
 } from "./cached_data_state";
 import useTmcsState from "./ui_state";
 import { useProjectedTmcMeta, useTmcDescription } from "./derived_data_state";
 
 import TmcDescription from "./components/TmcDescription";
 
-import { getTmcNetworkDescription, getNodesForTmcs } from "./api";
+import { getNodesForTmcs } from "./api";
 
 import {
   // Tmc,
@@ -115,6 +116,93 @@ const Bar: ({
   );
 };
 
+const Baz: ({
+  height,
+  width,
+}: {
+  height: number;
+  width: number;
+}) => JSX.Element = (props: { height: number; width: number }) => {
+  const { height, width } = props;
+  const { tmclinear_paths_a, tmclinear_paths_b } = useTmcLinearPathsMetadata();
+  const { setSelectedTmcs } = useTmcsState();
+  const [i, setI] = useState(0);
+  const [playing, setPlaying] = useState(false);
+
+  function setBackward() {
+    const { tmc } = tmclinear_paths_b[i];
+    console.log(tmc);
+    setPlaying(false);
+    setSelectedTmcs([tmc]);
+    setI(i > 0 ? i - 1 : tmclinear_paths_b.length - 1);
+  }
+
+  function stepForward() {
+    const { tmc } = tmclinear_paths_b[i];
+    console.log(tmc);
+    setPlaying(false);
+    setI((i + 1) % tmclinear_paths_b.length);
+    setSelectedTmcs([tmc]);
+  }
+
+  function play() {
+    setPlaying(true);
+  }
+
+  const pause = useCallback(
+    function () {
+      setPlaying(false);
+    },
+    [setPlaying]
+  );
+
+  const stop = useCallback(
+    function () {
+      // @ts-ignore
+      pause();
+      setI(0);
+      setSelectedTmcs([]);
+    },
+    [pause, setI, setSelectedTmcs]
+  );
+
+  useEffect(() => {
+    if (!playing) {
+      return;
+    }
+
+    if (i === tmclinear_paths_b.length) {
+      // @ts-ignore
+      return stop();
+    }
+
+    const { tmc } = tmclinear_paths_b[i];
+    console.log(tmc);
+    setSelectedTmcs([tmc]);
+
+    setTimeout(() => setI((i + 1) % tmclinear_paths_b.length), 1000);
+  }, [i, setI, playing, setPlaying, setSelectedTmcs, tmclinear_paths_b, stop]);
+
+  return (
+    <div>
+      <span onClick={setBackward}>⏮</span>
+      <span onClick={playing ? pause : play}>{playing ? "⏸" : "▶"}</span>
+      <span onClick={stop}>⏹</span>
+      <span onClick={stepForward}>⏭</span>
+      <pre
+        style={{
+          // FIXME: Move styling to parent and remove from props.
+          width: width - 20,
+          height: height - 80,
+          overflowY: "auto",
+        }}
+      >
+        {JSON.stringify({ tmclinear_paths_a, tmclinear_paths_b }, null, 4)}
+      </pre>
+    </div>
+  );
+};
+
 export function MapboxDiffLayerForm({
   this_cell_id,
   layer_meta,
@@ -140,7 +228,9 @@ export function MapboxDiffLayerForm({
   const [map_year_b, setMapYearB] = useState(_.last(years));
 
   const updateMapsMeta = useMapsMeta();
-  const { features_a, features_b } = useTmcFeatureCollections();
+  const feature_collections = useTmcFeatureCollections();
+  const { features_a, features_b } = feature_collections;
+  console.log(feature_collections);
 
   const [appended_rnd, setAppendedRnd] = useState(false);
 
@@ -262,21 +352,21 @@ export function MapboxDiffLayerForm({
     }
   }, [map, layer_names, hovered_tmcs, selected_tmcs]);
 
-  useEffect(() => {
-    (async () => {
-      const new_tmc_description = await getTmcNetworkDescription(
-        // @ts-ignore
-        map_year_a,
-        // @ts-ignore
-        map_year_b,
-        selected_tmcs?.[0] || null
-      );
+  // useEffect(() => {
+  // (async () => {
+  // const new_tmc_description = await getTmcNetworkDescription(
+  // // @ts-ignore
+  // map_year_a,
+  // // @ts-ignore
+  // map_year_b,
+  // selected_tmcs?.[0] || null
+  // );
 
-      console.log(new_tmc_description);
+  // console.log(new_tmc_description);
 
-      setTmcDescription(new_tmc_description);
-    })();
-  }, [selected_tmcs, map_year_a, map_year_b]);
+  // setTmcDescription(new_tmc_description);
+  // })();
+  // }, [selected_tmcs, map_year_a, map_year_b]);
 
   const dispatchLayerDependencyAChange = useCallback(
     (cell_id: CellID) =>
@@ -632,7 +722,8 @@ export function MapboxDiffLayerForm({
     // @ts-ignore
     appendVisualizationToMap([
       { title: "TMC Metadata", render: Foo },
-      { title: "TMC Net Meta", render: Bar },
+      // { title: "TMC Net Meta", render: Bar },
+      { title: "TmcLinear Meta", render: Baz },
     ]);
     setAppendedRnd(true);
   }

@@ -143,6 +143,26 @@ export async function getTmcsMetadata(year: number, tmcs: Tmc[]) {
   return metadata;
 }
 
+export async function getTmcLinearPathsMeta(year: number, tmcs: Tmc[]) {
+  const response = await fetch(
+    `${API_URL}/data-types/npmrds/network-analysis/getTmcLinearPathsMeta`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        year,
+        tmcs,
+      }), // body data type must match "Content-Type" header
+    }
+  );
+
+  const metadata = await response.json();
+
+  return metadata;
+}
+
 export async function getTmcNetworkDescription(
   year_a: number | null,
   year_b: number | null,

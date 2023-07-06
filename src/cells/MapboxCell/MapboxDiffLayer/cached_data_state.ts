@@ -8,7 +8,7 @@ import getTmcFeatures from "../../../api/getTmcFeatures";
 
 import { CellLookup } from "../../CellsContext";
 
-import { getTmcs, getTmcsMetadata } from "./api";
+import { getTmcLinearPathsMeta, getTmcs, getTmcsMetadata } from "./api";
 
 type TmcFeatures = turf.FeatureCollection<turf.MultiLineString>;
 
@@ -126,6 +126,36 @@ export const tmc_metadata_b = selector({
   },
 });
 
+export const tmclinear_paths_metadata_a = selector({
+  key: "tmclinear_paths_metadata_a",
+  get: async ({ get }) => {
+    const { tmcs = null, year = null } = get(tmcs_a) || {};
+
+    if (tmcs === null || year === null) {
+      return null;
+    }
+
+    const meta = await getTmcLinearPathsMeta(year, tmcs);
+
+    return meta;
+  },
+});
+
+export const tmclinear_paths_metadata_b = selector({
+  key: "tmclinear_paths_metadata_b",
+  get: async ({ get }) => {
+    const { tmcs = null, year = null } = get(tmcs_b) || {};
+
+    if (tmcs === null || year === null) {
+      return null;
+    }
+
+    const meta = await getTmcLinearPathsMeta(year, tmcs);
+
+    return meta;
+  },
+});
+
 export const useMapYears = () => ({
   map_year_a: useRecoilValue(map_meta_a)?.year || null,
   map_year_b: useRecoilValue(map_meta_b)?.year || null,
@@ -161,56 +191,54 @@ export function useMapsMeta() {
   return updateMapsMeta;
 }
 
+const createPairTransactionHook = (info_a: any, info_b: any) =>
+  function () {
+    const { alias: alias_a, atom: atom_a } = info_a;
+    const { alias: alias_b, atom: atom_b } = info_b;
+
+    const a = useRecoilValue(atom_a) as NonNullable<any> | null;
+    const b = useRecoilValue(atom_b) as NonNullable<any> | null;
+
+    const state = useRef<
+      Record<string, NonNullable<any>> | Record<string, null>
+    >(
+      a === null || b === null
+        ? { [alias_a]: null, [alias_b]: null }
+        : { [alias_a]: a, [alias_b]: b }
+    );
+
+    // console.log("useCachedDataState:", { features_a, features_b, state });
+
+    if (a === state.current[alias_a] && b === state.current[alias_b]) {
+      return state.current;
+    }
+
+    if (a === null || b === null) {
+      state.current = {
+        [alias_a]: null,
+        [alias_b]: null,
+      };
+
+      return state.current;
+    }
+
+    if (a !== state.current.a || b !== state.current.b) {
+      state.current = {
+        [alias_a]: a,
+        [alias_b]: b,
+      } as Record<string, NonNullable<any>>;
+    }
+
+    return state.current;
+  };
+
 // Change to use selector
-export function useTmcFeatureCollections() {
-  const features_a = useRecoilValue(tmc_features_a) as TmcFeatures | null;
-  const features_b = useRecoilValue(tmc_features_b) as TmcFeatures | null;
+export const useTmcFeatureCollections = createPairTransactionHook(
+  { alias: "features_a", atom: tmc_features_a },
+  { alias: "features_b", atom: tmc_features_b }
+);
 
-  const state = useRef<
-    | {
-        features_a: TmcFeatures;
-        features_b: TmcFeatures;
-      }
-    | {
-        features_a: null;
-        features_b: null;
-      }
-  >(
-    features_a === null || features_b === null
-      ? { features_a: null, features_b: null }
-      : { features_a, features_b }
-  );
-
-  // console.log("useCachedDataState:", { features_a, features_b, state });
-
-  if (
-    features_a === state.current.features_a &&
-    features_b === state.current.features_b
-  ) {
-    return state.current;
-  }
-
-  if (features_a === null || features_b === null) {
-    state.current = {
-      features_a: null,
-      features_b: null,
-    };
-
-    return state.current;
-  }
-
-  if (
-    features_a !== state.current.features_a ||
-    features_b !== state.current.features_b
-  ) {
-    state.current = {
-      features_a,
-      features_b,
-    } as {
-      features_a: TmcFeatures;
-      features_b: TmcFeatures;
-    };
-  }
-
-  return state.current;
-}
+export const useTmcLinearPathsMetadata = createPairTransactionHook(
+  { alias: "tmclinear_paths_a", atom: tmclinear_paths_metadata_a },
+  { alias: "tmclinear_paths_b", atom: tmclinear_paths_metadata_b }
+);

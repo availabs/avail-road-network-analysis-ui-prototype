@@ -69,15 +69,28 @@ const map_initial_state = {
 function WrappedViz({
   title = "Handle",
   render,
+  dock_index = 0,
 }: {
   title: string;
-  render: ({ height, width }: { height: number; width: number }) => JSX.Element;
+  render: ({
+    height,
+    width,
+  }: {
+    height: number;
+    width: number;
+  }) => JSX.Element | null;
+  dock_index: number;
 }) {
-  const [visible, setVisible] = useState(true);
-  const [rnd_size, setRndSize] = useState({ width: 320, height: 200 });
+  const default_width = 320;
+  const docked_x = dock_index * (default_width + 10);
+  const [visible, setVisible] = useState(false);
+  const [rnd_size, setRndSize] = useState({
+    width: default_width,
+    height: 200,
+  });
 
   // TODO: These should Dock using <Foo>{...children}</Foo> and styling.
-  const [rnd_position, setRndPosition] = useState({ x: 0, y: 0 });
+  const [rnd_position, setRndPosition] = useState({ x: docked_x, y: 0 });
 
   const toggleVisabilty: MouseEventHandler<HTMLSpanElement> = (e) => {
     console.log("MouseEvent Detail:", e.detail);
@@ -87,7 +100,9 @@ function WrappedViz({
     }
   };
 
-  const position = visible ? rnd_position : { x: 0, y: 0 };
+  const position = visible ? rnd_position : { x: docked_x, y: 0 };
+
+  const viz = render(rnd_size) || <div>No Data</div>;
 
   return (
     <Rnd
@@ -96,6 +111,8 @@ function WrappedViz({
         justifyContent: "center",
         border: "solid 1px #ddd",
         background: "#f0f0f0",
+        minWidth: rnd_size.width,
+        minHeight: rnd_size.height,
       }}
       dragHandleClassName="rnd-handle"
       size={visible ? { ...rnd_size } : { height: 40, width: 160 }}
@@ -106,14 +123,32 @@ function WrappedViz({
           return;
         }
 
+        const was_dragged =
+          (rnd_position.x !== d.x || rnd_position.y !== d.y) &&
+          d.x !== docked_x &&
+          d.y !== 0;
+
+        console.log(
+          "==> was_dragged:",
+          was_dragged,
+          e.detail === 1 && !visible
+        );
+
         //  If not visible, need to double-click docked component
         //    to make visible and move to last visible position.
         if (e.detail === 1 && !visible) {
+          if (was_dragged) {
+            console.log("setRndPosition");
+            setVisible(true);
+            setRndPosition({ x: d.x, y: d.y });
+          }
+
           return;
         }
 
         // Dragged position
-        if (rnd_position.x !== d.x || rnd_position.y !== d.y) {
+        if (was_dragged) {
+          console.log("setRndPosition");
           setRndPosition({ x: d.x, y: d.y });
         }
       }}
@@ -133,7 +168,7 @@ function WrappedViz({
               {title}
             </span>
           </CardContent>
-          <CardContent>{render(rnd_size)}</CardContent>
+          <CardContent>{viz}</CardContent>
         </Card>
       </Box>
     </Rnd>
@@ -149,7 +184,9 @@ export default function MapboxCell() {
     <div></div>,
   ]);
 
-  function appendVisualizationToMap(props: {
+  console.log("visualization_children.length:", visualization_children.length);
+
+  type AppendProps = {
     title: string;
     render: ({
       height,
@@ -157,13 +194,20 @@ export default function MapboxCell() {
     }: {
       height: number;
       width: number;
-    }) => JSX.Element;
-  }) {
-    setVisualizationChilden([
-      ...visualization_children,
-      // @ts-ignore
-      <WrappedViz {...props} />,
-    ]);
+    }) => JSX.Element | null;
+  };
+
+  function appendVisualizationToMap(props: AppendProps | AppendProps[]) {
+    props = Array.isArray(props) ? props : [props];
+
+    const vizs = props.map((p2, i) => {
+      const dock_index = visualization_children.length + i;
+      const p = { ...p2, dock_index };
+
+      return <WrappedViz {...p} key={dock_index} />;
+    });
+
+    setVisualizationChilden([...visualization_children, ...vizs]);
   }
 
   // CONSIDER: Cells pass their Maps their state through props.
@@ -328,10 +372,7 @@ export default function MapboxCell() {
         className="map-container"
       />
       <Suspense>
-        <div style={{ position: "absolute" }}>
-          {visualization_children}
-          <strong>DOCK</strong>
-        </div>
+        <div style={{ position: "absolute" }}>{visualization_children}</div>
       </Suspense>
     </div>
   );

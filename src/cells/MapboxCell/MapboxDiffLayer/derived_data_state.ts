@@ -117,15 +117,20 @@ const tmc_description = selector({
 
     // TODO: If no data, hide the visualization with hide_if_empty checkbox.
     // TODO: Decompose getTmcNetworkDescription
-    const tmc_description = await getTmcNetworkDescription(
-      // @ts-ignore
-      map_year_a,
-      // @ts-ignore
-      map_year_b,
-      selected_tmcs?.[0] || null
-    );
+    try {
+      const tmc_description = await getTmcNetworkDescription(
+        // @ts-ignore
+        map_year_a,
+        // @ts-ignore
+        map_year_b,
+        selected_tmcs?.[0] || null
+      );
 
-    return tmc_description;
+      return tmc_description;
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
   },
 });
 
