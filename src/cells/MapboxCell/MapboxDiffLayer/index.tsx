@@ -143,13 +143,13 @@ export function MapboxDiffLayerForm({
   layer_meta,
   dispatch,
   map,
-  appendVisualization,
+  appendVisualizationToMap,
 }: {
   this_cell_id: CellID;
   layer_meta: LayerMeta;
   dispatch: (action: CellAction) => void;
   map: Map;
-  appendVisualization: any;
+  appendVisualizationToMap: any;
 }) {
   const {
     layer_id,
@@ -659,7 +659,7 @@ export function MapboxDiffLayerForm({
 
   if (!appended_rnd) {
     // @ts-ignore
-    appendVisualization({ title: "TMC Metadata", render: Foo });
+    appendVisualizationToMap({ title: "TMC Metadata", render: Foo });
     setAppendedRnd(true);
   }
 

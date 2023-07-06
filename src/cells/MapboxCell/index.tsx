@@ -56,7 +56,13 @@ const map_initial_state = {
 //  We let the descentent components inject visualizations into the ancestor
 //    so that their positioning is relative to the map.
 //
-//  TODO: Move appendVisualization from props to Context to avoid props drilling.
+//  TODO: Move appendVisualizationToMap from props to Context to avoid props drilling.
+//
+//        Typed Composition via Dependency Injection of:
+//          * Contoller/Presentation Components
+//          * Recoil's DataFlow DAGs' Dynamic Dependencies
+//            * https://recoiljs.org/docs/api-reference/core/selector/#dynamic-dependencies
+//          * Pipelines from OpenAPIs to UI component building workflows working off persistable blueprints.
 //
 // https://legacy.reactjs.org/docs/render-props.html
 // https://www.patterns.dev/posts/render-props-pattern
@@ -70,7 +76,8 @@ function WrappedViz({
   const [visible, setVisible] = useState(true);
   const [rnd_size, setRndSize] = useState({ width: 320, height: 200 });
 
-  console.log(rnd_size);
+  // TODO: These should Dock using <Foo>{...children}</Foo> and styling.
+  const [rnd_position, setRndPosition] = useState({ x: 0, y: 0 });
 
   const toggleVisabilty: MouseEventHandler<HTMLSpanElement> = (e) => {
     console.log("MouseEvent Detail:", e.detail);
@@ -79,6 +86,8 @@ function WrappedViz({
       setVisible(!visible);
     }
   };
+
+  const position = visible ? rnd_position : { x: 0, y: 0 };
 
   return (
     <Rnd
@@ -90,7 +99,24 @@ function WrappedViz({
       }}
       dragHandleClassName="rnd-handle"
       size={visible ? { ...rnd_size } : { height: 40, width: 160 }}
-      // @ts-ignore
+      position={position}
+      onDragStop={(e, d) => {
+        // Double-click to toggle visibility. Preserve old rnd_position.
+        if (e.detail === 2) {
+          return;
+        }
+
+        //  If not visible, need to double-click docked component
+        //    to make visible and move to last visible position.
+        if (e.detail === 1 && !visible) {
+          return;
+        }
+
+        // Dragged position
+        if (rnd_position.x !== d.x || rnd_position.y !== d.y) {
+          setRndPosition({ x: d.x, y: d.y });
+        }
+      }}
       onResizeStop={(_e, _direction, _ref, delta, _position) => {
         const { width, height } = delta;
 
@@ -123,7 +149,7 @@ export default function MapboxCell() {
     <div></div>,
   ]);
 
-  function appendVisualization(props: {
+  function appendVisualizationToMap(props: {
     title: string;
     render: ({
       height,
@@ -221,7 +247,7 @@ export default function MapboxCell() {
             layer_meta={layer_meta}
             dispatch={diffLayerDispatch}
             map={map.current!}
-            appendVisualization={appendVisualization}
+            appendVisualizationToMap={appendVisualizationToMap}
           />
         </Suspense>
       ))
