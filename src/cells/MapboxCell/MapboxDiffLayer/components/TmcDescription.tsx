@@ -34,6 +34,30 @@ export default function TmcDescription({
   const min_year = Math.min(year_a, year_b);
   const max_year = Math.max(year_a, year_b);
 
+  const formatted_net_description_a = Object.entries(
+    tmc_net_description_a
+  ).reduce((acc, [k, v]) => {
+    // @ts-ignore
+    acc[k] = typeof v === "number" ? v.toLocaleString() : v;
+    return acc;
+  }, {}) as typeof tmc_net_description_a;
+
+  const formatted_net_description_b = Object.entries(
+    tmc_net_description_b
+  ).reduce((acc, [k, v]) => {
+    // @ts-ignore
+    acc[k] = typeof v === "number" ? v.toLocaleString() : v;
+    return acc;
+  }, {}) as typeof tmc_net_description_b;
+
+  const formatted_tmc_similarity = Object.entries(
+    tmc_cross_year_similarity
+  ).reduce((acc, [k, v]) => {
+    // @ts-ignore
+    acc[k] = typeof v === "number" ? v.toLocaleString() : v;
+    return acc;
+  }, {}) as typeof tmc_cross_year_similarity;
+
   return (
     <Card sx={{ minWidth: 275, marginTop: 3 }}>
       <CardContent>
@@ -41,7 +65,7 @@ export default function TmcDescription({
           TMC Cross-Year Description
         </Typography>
         <Typography variant="h6" gutterBottom>
-          TMC: {tmc_net_description_a.tmc}
+          TMC: {formatted_net_description_a.tmc}
         </Typography>
 
         <TableContainer component={Paper}>
@@ -65,10 +89,10 @@ export default function TmcDescription({
                   County
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_net_description_a.county}
+                  {formatted_net_description_a.county}
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_net_description_b.county}
+                  {formatted_net_description_b.county}
                 </TableCell>
               </TableRow>
 
@@ -78,8 +102,12 @@ export default function TmcDescription({
                 <TableCell component="th" scope="row">
                   ZIP Code
                 </TableCell>
-                <TableCell align="right">{tmc_net_description_a.zip}</TableCell>
-                <TableCell align="right">{tmc_net_description_b.zip}</TableCell>
+                <TableCell align="right">
+                  {formatted_net_description_a.zip}
+                </TableCell>
+                <TableCell align="right">
+                  {formatted_net_description_b.zip}
+                </TableCell>
               </TableRow>
 
               <TableRow
@@ -89,10 +117,10 @@ export default function TmcDescription({
                   Road Number
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_net_description_a.roadnumber}
+                  {formatted_net_description_a.roadnumber}
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_net_description_b.roadnumber}
+                  {formatted_net_description_b.roadnumber}
                 </TableCell>
               </TableRow>
 
@@ -103,10 +131,10 @@ export default function TmcDescription({
                   Road Name
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_net_description_a.roadname}
+                  {formatted_net_description_a.roadname}
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_net_description_b.roadname}
+                  {formatted_net_description_b.roadname}
                 </TableCell>
               </TableRow>
 
@@ -117,10 +145,10 @@ export default function TmcDescription({
                   Direction
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_net_description_a.direction}
+                  {formatted_net_description_a.direction}
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_net_description_b.direction}
+                  {formatted_net_description_b.direction}
                 </TableCell>
               </TableRow>
 
@@ -131,10 +159,10 @@ export default function TmcDescription({
                   Functional Class
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_net_description_a.func_class}
+                  {formatted_net_description_a.func_class}
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_net_description_b.func_class}
+                  {formatted_net_description_b.func_class}
                 </TableCell>
               </TableRow>
 
@@ -145,10 +173,10 @@ export default function TmcDescription({
                   TMC Linear (Road Corridor ID)
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_net_description_a.linear_id}
+                  {formatted_net_description_a.linear_id}
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_net_description_b.linear_id}
+                  {formatted_net_description_b.linear_id}
                 </TableCell>
               </TableRow>
 
@@ -161,13 +189,13 @@ export default function TmcDescription({
                 <TableCell align="right">
                   {
                     // @ts-ignore
-                    TmcType[tmc_net_description_a.type]
+                    TmcType[formatted_net_description_a.type]
                   }
                 </TableCell>
                 <TableCell align="right">
                   {
                     // @ts-ignore
-                    TmcType[tmc_net_description_b.type]
+                    TmcType[formatted_net_description_b.type]
                   }
                 </TableCell>
               </TableRow>
@@ -197,10 +225,10 @@ export default function TmcDescription({
                   Length (miles)
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_net_description_a.miles}
+                  {formatted_net_description_a.miles}
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_net_description_b.miles}
+                  {formatted_net_description_b.miles}
                 </TableCell>
               </TableRow>
 
@@ -211,10 +239,10 @@ export default function TmcDescription({
                   Length (meters)
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_cross_year_similarity.length_meters_a}
+                  {formatted_tmc_similarity.length_meters_a}
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_cross_year_similarity.length_meters_b}
+                  {formatted_tmc_similarity.length_meters_b}
                 </TableCell>
               </TableRow>
 
@@ -225,10 +253,10 @@ export default function TmcDescription({
                   Straight Line Distance (meters)
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_cross_year_similarity.straight_line_dist_meters_a}
+                  {formatted_tmc_similarity.straight_line_dist_meters_a}
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_cross_year_similarity.straight_line_dist_meters_b}
+                  {formatted_tmc_similarity.straight_line_dist_meters_b}
                 </TableCell>
               </TableRow>
 
@@ -245,10 +273,10 @@ export default function TmcDescription({
                   </a>{" "}
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_cross_year_similarity.sinuosity_a}
+                  {formatted_tmc_similarity.sinuosity_a}
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_cross_year_similarity.sinuosity_b}
+                  {formatted_tmc_similarity.sinuosity_b}
                 </TableCell>
               </TableRow>
 
@@ -266,10 +294,10 @@ export default function TmcDescription({
                   (degrees)
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_cross_year_similarity.bearing_degrees_a}
+                  {formatted_tmc_similarity.bearing_degrees_a}
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_cross_year_similarity.bearing_degrees_b}
+                  {formatted_tmc_similarity.bearing_degrees_b}
                 </TableCell>
               </TableRow>
 
@@ -311,7 +339,7 @@ export default function TmcDescription({
                   Distance Between Start Points (meters)
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_cross_year_similarity.start_pt_diff_meters}
+                  {formatted_tmc_similarity.start_pt_diff_meters}
                 </TableCell>
               </TableRow>
 
@@ -322,7 +350,7 @@ export default function TmcDescription({
                   Distance Between End Points (meters)
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_cross_year_similarity.end_pt_diff_meters}
+                  {formatted_tmc_similarity.end_pt_diff_meters}
                 </TableCell>
               </TableRow>
 
@@ -340,7 +368,7 @@ export default function TmcDescription({
                   (meters)
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_cross_year_similarity.hausdorff_distance_meters}
+                  {formatted_tmc_similarity.hausdorff_distance_meters}
                 </TableCell>
               </TableRow>
 
@@ -358,7 +386,7 @@ export default function TmcDescription({
                   (meters)
                 </TableCell>
                 <TableCell align="right">
-                  {tmc_cross_year_similarity.frechet_distance_meters}
+                  {formatted_tmc_similarity.frechet_distance_meters}
                 </TableCell>
               </TableRow>
             </TableBody>

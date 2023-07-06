@@ -18,12 +18,12 @@ type MapMeta = {
   year: number;
 };
 
-const map_meta_a = atom<MapMeta | null>({
+export const map_meta_a = atom<MapMeta | null>({
   key: "map_meta_a",
   default: null,
 });
 
-const map_meta_b = atom<MapMeta | null>({
+export const map_meta_b = atom<MapMeta | null>({
   key: "map_meta_b",
   default: null,
 });
@@ -124,6 +124,11 @@ export const tmc_metadata_b = selector({
 
     return meta;
   },
+});
+
+export const useMapYears = () => ({
+  map_year_a: useRecoilValue(map_meta_a)?.year || null,
+  map_year_b: useRecoilValue(map_meta_b)?.year || null,
 });
 
 // Change to use selector

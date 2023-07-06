@@ -1,10 +1,16 @@
-import { useRef, useCallback } from "react";
+import { useRef } from "react";
 import { selector, useRecoilValue } from "recoil";
 
 import _ from "lodash";
 
-import { tmc_metadata_a, tmc_metadata_b } from "./cached_data_state";
+import {
+  map_meta_a,
+  map_meta_b,
+  tmc_metadata_a,
+  tmc_metadata_b,
+} from "./cached_data_state";
 import { hovered_tmcs_atom, selected_tmcs_atom } from "./ui_state";
+import { getTmcNetworkDescription } from "./api";
 
 const projected_tmc_meta_a = selector({
   key: "projected_tmc_meta_a",
@@ -46,7 +52,7 @@ const projected_tmc_meta_b = selector({
   },
 });
 
-// Change to use selector
+// Change to use selector for complete TRANSACTION of both available.
 export function useProjectedTmcMeta() {
   const tmc_meta_a = useRecoilValue(projected_tmc_meta_a);
   const tmc_meta_b = useRecoilValue(projected_tmc_meta_b);
@@ -90,3 +96,37 @@ export function useProjectedTmcMeta() {
 
   return state.current;
 }
+
+const tmc_description = selector({
+  key: "tmc_description",
+  get: async ({ get }) => {
+    const { year: map_year_a = null } = get(map_meta_a) || {};
+    const { year: map_year_b = null } = get(map_meta_b) || {};
+
+    // NOTE: Too expensive an API call to enable hovered.
+    // NOTE: When decomposed, some element may be inexpensive.
+    const selected_tmcs = get(selected_tmcs_atom);
+
+    if (
+      map_year_a === null ||
+      map_year_b === null ||
+      selected_tmcs?.length === 0
+    ) {
+      return null;
+    }
+
+    // TODO: If no data, hide the visualization with hide_if_empty checkbox.
+    // TODO: Decompose getTmcNetworkDescription
+    const tmc_description = await getTmcNetworkDescription(
+      // @ts-ignore
+      map_year_a,
+      // @ts-ignore
+      map_year_b,
+      selected_tmcs?.[0] || null
+    );
+
+    return tmc_description;
+  },
+});
+
+export const useTmcDescription = () => useRecoilValue(tmc_description);

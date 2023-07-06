@@ -1,12 +1,4 @@
-import {
-  FunctionComponent,
-  Suspense,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import _ from "lodash";
 import { Map } from "mapbox-gl"; // eslint-disable-line import/no-webpack-loader-syntax
@@ -36,9 +28,13 @@ import { getSourceAndLayerNames, getPolygons } from "./utils";
 
 import { CellAction, CellActionType } from "./state";
 
-import { useMapsMeta, useTmcFeatureCollections } from "./cached_data_state";
+import {
+  useMapYears,
+  useMapsMeta,
+  useTmcFeatureCollections,
+} from "./cached_data_state";
 import useTmcsState from "./ui_state";
-import { useProjectedTmcMeta } from "./derived_data_state";
+import { useProjectedTmcMeta, useTmcDescription } from "./derived_data_state";
 
 import TmcDescription from "./components/TmcDescription";
 
@@ -57,64 +53,6 @@ export {
   CellActionType,
 } from "./state";
 
-/*
-function Foo() {
-  const { tmc_meta_a, tmc_meta_b } = useProjectedTmcMeta();
-
-  const [visible, setVisible] = useState(true);
-  const [rnd_size, setRndSize] = useState({ width: 320, height: 200 });
-
-  // useEffect(() => {
-  // setTimeout(() => setVisible(!visible), 5000);
-  // }, [visible, setVisible]);
-
-  console.log(rnd_size);
-
-  const pre = (
-    <pre
-      style={{
-        width: visible ? rnd_size.width - 20 : 0,
-        height: visible ? rnd_size.height - 80 : 0,
-        overflowY: "auto",
-        visibility: visible ? "visible" : "hidden",
-      }}
-    >
-      {JSON.stringify({ tmc_meta_a, tmc_meta_b }, null, 4)}
-    </pre>
-  );
-
-  return (
-    <Rnd
-      style={{
-        alignItems: "center",
-        justifyContent: "center",
-        border: "solid 1px #ddd",
-        background: "#f0f0f0",
-      }}
-      dragHandleClassName="rnd-handle"
-      size={visible ? { ...rnd_size } : { height: 50, width: 100 }}
-      onResizeStop={(e, direction, ref, delta, position) => {
-        const { width, height } = delta;
-
-        setRndSize({
-          width: rnd_size.width + width,
-          height: rnd_size.height + height,
-        });
-      }}
-    >
-      <Box style={{ width: "100%", height: "100%" }}>
-        <Card style={{ height: "100%" }}>
-          <CardContent>
-            <span className="rnd-handle">Handle</span>
-          </CardContent>
-          <CardContent>{pre}</CardContent>
-        </Card>
-      </Box>
-    </Rnd>
-  );
-}
-*/
-
 const Foo: ({
   height,
   width,
@@ -128,6 +66,7 @@ const Foo: ({
   return (
     <pre
       style={{
+        // FIXME: Move styling to parent and remove from props.
         width: width - 20,
         height: height - 80,
         overflowY: "auto",
@@ -135,6 +74,44 @@ const Foo: ({
     >
       {JSON.stringify({ tmc_meta_a, tmc_meta_b }, null, 4)}
     </pre>
+  );
+};
+
+const Bar: ({
+  height,
+  width,
+}: {
+  height: number;
+  width: number;
+}) => JSX.Element | null = (props: { height: number; width: number }) => {
+  const { height, width } = props;
+
+  const map_years = useMapYears();
+  const tmc_description = useTmcDescription();
+
+  if (
+    map_years.map_year_a === null ||
+    map_years.map_year_b === null ||
+    tmc_description === null
+  ) {
+    return null;
+  }
+
+  return (
+    <div
+      style={{
+        // FIXME: Move styling to parent and remove from props.
+        width,
+        height,
+        overflowY: "auto",
+      }}
+    >
+      <TmcDescription
+        year_a={map_years.map_year_a}
+        year_b={map_years.map_year_b}
+        tmc_description={tmc_description}
+      ></TmcDescription>
+    </div>
   );
 };
 
@@ -244,12 +221,6 @@ export function MapboxDiffLayerForm({
   const { cells } = useContext(CellsContext);
 
   const this_cell = cells[this_cell_id];
-
-  // const [year_a, year_b] = getYearsFromLayerDependencies(
-  // cells,
-  // layer_dependency_id_a,
-  // layer_dependency_id_b
-  // );
 
   useEffect(() => {
     if (!map) {
@@ -659,7 +630,10 @@ export function MapboxDiffLayerForm({
 
   if (!appended_rnd) {
     // @ts-ignore
-    appendVisualizationToMap({ title: "TMC Metadata", render: Foo });
+    appendVisualizationToMap([
+      { title: "TMC Metadata", render: Foo },
+      { title: "TMC Net Meta", render: Bar },
+    ]);
     setAppendedRnd(true);
   }
 
@@ -770,11 +744,14 @@ export function MapboxDiffLayerForm({
           </Button>
         </div>
       </Card>
+    </Box>
+  );
+}
+
+/*
       <TmcDescription
         year_a={map_year_a as number}
         year_b={map_year_b as number}
         tmc_description={tmc_description}
       />
-    </Box>
-  );
-}
+*/
