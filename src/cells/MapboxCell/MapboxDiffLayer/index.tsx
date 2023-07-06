@@ -126,23 +126,28 @@ const Baz: ({
   const { height, width } = props;
   const { tmclinear_paths_a, tmclinear_paths_b } = useTmcLinearPathsMetadata();
   const { setSelectedTmcs } = useTmcsState();
-  const [i, setI] = useState(0);
+  const [i, setI] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
 
-  function setBackward() {
+  useEffect(() => {
+    if (i === null) {
+      return;
+    }
+
     const { tmc } = tmclinear_paths_b[i];
-    console.log(tmc);
-    setPlaying(false);
     setSelectedTmcs([tmc]);
-    setI(i > 0 ? i - 1 : tmclinear_paths_b.length - 1);
+  }, [i, tmclinear_paths_b, setSelectedTmcs]);
+
+  function setBackward() {
+    setPlaying(false);
+    // @ts-ignore
+    setI(+i > 0 ? +i - 1 : tmclinear_paths_b.length - 1);
   }
 
   function stepForward() {
-    const { tmc } = tmclinear_paths_b[i];
-    console.log(tmc);
     setPlaying(false);
-    setI((i + 1) % tmclinear_paths_b.length);
-    setSelectedTmcs([tmc]);
+    // @ts-ignore
+    setI((+i + 1) % tmclinear_paths_b.length);
   }
 
   function play() {
@@ -160,7 +165,7 @@ const Baz: ({
     function () {
       // @ts-ignore
       pause();
-      setI(0);
+      setI(null);
       setSelectedTmcs([]);
     },
     [pause, setI, setSelectedTmcs]
@@ -176,11 +181,13 @@ const Baz: ({
       return stop();
     }
 
-    const { tmc } = tmclinear_paths_b[i];
+    // @ts-ignore
+    const { tmc } = tmclinear_paths_b[+i as number];
     console.log(tmc);
     setSelectedTmcs([tmc]);
 
-    setTimeout(() => setI((i + 1) % tmclinear_paths_b.length), 1000);
+    // @ts-ignore
+    setTimeout(() => setI((+i + 1) % tmclinear_paths_b.length), 1000);
   }, [i, setI, playing, setPlaying, setSelectedTmcs, tmclinear_paths_b, stop]);
 
   return (
@@ -722,7 +729,7 @@ export function MapboxDiffLayerForm({
     // @ts-ignore
     appendVisualizationToMap([
       { title: "TMC Metadata", render: Foo },
-      // { title: "TMC Net Meta", render: Bar },
+      { title: "TMC Net Meta", render: Bar },
       { title: "TmcLinear Meta", render: Baz },
     ]);
     setAppendedRnd(true);
