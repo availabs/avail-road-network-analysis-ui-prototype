@@ -1,4 +1,12 @@
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import {
+  FunctionComponent,
+  Suspense,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import _ from "lodash";
 import { Map } from "mapbox-gl"; // eslint-disable-line import/no-webpack-loader-syntax
@@ -49,16 +57,99 @@ export {
   CellActionType,
 } from "./state";
 
+/*
+function Foo() {
+  const { tmc_meta_a, tmc_meta_b } = useProjectedTmcMeta();
+
+  const [visible, setVisible] = useState(true);
+  const [rnd_size, setRndSize] = useState({ width: 320, height: 200 });
+
+  // useEffect(() => {
+  // setTimeout(() => setVisible(!visible), 5000);
+  // }, [visible, setVisible]);
+
+  console.log(rnd_size);
+
+  const pre = (
+    <pre
+      style={{
+        width: visible ? rnd_size.width - 20 : 0,
+        height: visible ? rnd_size.height - 80 : 0,
+        overflowY: "auto",
+        visibility: visible ? "visible" : "hidden",
+      }}
+    >
+      {JSON.stringify({ tmc_meta_a, tmc_meta_b }, null, 4)}
+    </pre>
+  );
+
+  return (
+    <Rnd
+      style={{
+        alignItems: "center",
+        justifyContent: "center",
+        border: "solid 1px #ddd",
+        background: "#f0f0f0",
+      }}
+      dragHandleClassName="rnd-handle"
+      size={visible ? { ...rnd_size } : { height: 50, width: 100 }}
+      onResizeStop={(e, direction, ref, delta, position) => {
+        const { width, height } = delta;
+
+        setRndSize({
+          width: rnd_size.width + width,
+          height: rnd_size.height + height,
+        });
+      }}
+    >
+      <Box style={{ width: "100%", height: "100%" }}>
+        <Card style={{ height: "100%" }}>
+          <CardContent>
+            <span className="rnd-handle">Handle</span>
+          </CardContent>
+          <CardContent>{pre}</CardContent>
+        </Card>
+      </Box>
+    </Rnd>
+  );
+}
+*/
+
+const Foo: ({
+  height,
+  width,
+}: {
+  height: number;
+  width: number;
+}) => JSX.Element = (props: { height: number; width: number }) => {
+  const { height, width } = props;
+  const { tmc_meta_a, tmc_meta_b } = useProjectedTmcMeta();
+
+  return (
+    <pre
+      style={{
+        width: width - 20,
+        height: height - 80,
+        overflowY: "auto",
+      }}
+    >
+      {JSON.stringify({ tmc_meta_a, tmc_meta_b }, null, 4)}
+    </pre>
+  );
+};
+
 export function MapboxDiffLayerForm({
   this_cell_id,
   layer_meta,
   dispatch,
   map,
+  appendVisualization,
 }: {
   this_cell_id: CellID;
   layer_meta: LayerMeta;
   dispatch: (action: CellAction) => void;
   map: Map;
+  appendVisualization: any;
 }) {
   const {
     layer_id,
@@ -73,13 +164,8 @@ export function MapboxDiffLayerForm({
 
   const updateMapsMeta = useMapsMeta();
   const { features_a, features_b } = useTmcFeatureCollections();
-  const { tmc_meta_a, tmc_meta_b } = useProjectedTmcMeta();
 
-  useEffect(() => {
-    console.log("===== TMC Metadta =====");
-    console.log({ tmc_meta_a, tmc_meta_b });
-    console.log("=======================");
-  }, [tmc_meta_a, tmc_meta_b]);
+  const [appended_rnd, setAppendedRnd] = useState(false);
 
   const [
     { sources: source_names, layers: layer_names },
@@ -571,6 +657,13 @@ export function MapboxDiffLayerForm({
     )
   );
 
+  if (!appended_rnd) {
+    // @ts-ignore
+    appendVisualization({ title: "TMC Metadata", render: Foo });
+    setAppendedRnd(true);
+  }
+
+  // https://stackoverflow.com/a/32917613/3970755
   return (
     <Box key={layer_id} style={{ paddingBottom: 10 }}>
       <Card sx={{ minWidth: 275 }}>
@@ -677,7 +770,6 @@ export function MapboxDiffLayerForm({
           </Button>
         </div>
       </Card>
-
       <TmcDescription
         year_a={map_year_a as number}
         year_b={map_year_b as number}
