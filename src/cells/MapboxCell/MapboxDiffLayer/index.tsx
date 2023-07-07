@@ -312,9 +312,6 @@ export function MapboxDiffLayerForm({
     }
   }, [map, layer_names, handleHover, handleClick]);
 
-  const [tmc_description, setTmcDescription] =
-    useState<TmcCrossYearDescription | null>(null);
-
   const { cells } = useContext(CellsContext);
 
   const this_cell = cells[this_cell_id];

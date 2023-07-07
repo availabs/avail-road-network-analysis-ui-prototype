@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { selector, useRecoilValue } from "recoil";
+import { selector, useRecoilValue, useRecoilValueLoadable } from "recoil";
 
 import _ from "lodash";
 
@@ -134,4 +134,22 @@ const tmc_description = selector({
   },
 });
 
-export const useTmcDescription = () => useRecoilValue(tmc_description);
+// export const useTmcDescription = () => useRecoilValue(tmc_description);
+export function useTmcDescription() {
+  // CONSIDER FIXME: Solves flickering but keeps stale data in UI.
+  // https://github.com/facebookexperimental/Recoil/discussions/1948
+  // https://recoiljs.org/docs/api-reference/core/useRecoilValueLoadable
+  const loadable = useRecoilValueLoadable(tmc_description);
+
+  const ref = useRef(loadable.contents);
+
+  if (loadable.state === "loading") {
+    return ref.current;
+  }
+
+  if (!_.isEqual(loadable.contents, ref.current)) {
+    ref.current = loadable.contents;
+  }
+
+  return ref.current;
+}
